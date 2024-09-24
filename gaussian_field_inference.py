@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as np
+from jax import jit, vmap
 import numpy as onp
 import h5py as h5
 import jax_cosmo as jc
@@ -25,10 +26,6 @@ with open(configfile, "r") as stream:
 z_bins  = np.arange(0., 3.000000001, 0.01)
 delta_z = (z_bins[1:] - z_bins[:-1])
 z_grid = 0.5 * (z_bins[1:] + z_bins[:-1])
-
-##############################################################
-########## To-do: Define the slab boundaries in the config
-##############################################################
 
 
 CHI_MIN    = config['slabs']['chi_min']
@@ -153,7 +150,17 @@ from numpyro.infer import MCMC, NUTS, init_to_value
 key = jax.random.PRNGKey(onp.random.randint(1000000))
 rng_key, rng_key_ = jax.random.split(key)
 
-def density_slab_model(nz_src_list, nz_lens_list, dens_slabs):
+def get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs):
+    kappa_list        = [get_kappa(nz_src_list[i], cosmo.Omega_m, Dz_src[i], dens_slabs) for i in range(N_SRC_BINS)]
+    return np.stack(kappa_list)
+
+def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, dens_slabs):
+    kappa_list        = [get_kappa_ia(nz_src_list[i], cosmo.Omega_m, Dz_src[i], A_ia, eta_ia, dens_slabs) for i in range(N_SRC_BINS)]
+    return np.stack(kappa_list)
+
+get_gamma = jit(vmap(F.kappa2gamma))
+
+def density_slab_model(nz_src_list, nz_lens_list):
     Omega_m = 0.3
     x_l     = numpyro.sample("x_l", dist.Normal(np.zeros((N_slabs,2,N_grid,N_grid//2 + 1)), np.ones((N_slabs,2,N_grid,N_grid//2 + 1))), rng_key=key)
     dens_slabs = transform.x2G(x_l)
@@ -161,14 +168,14 @@ def density_slab_model(nz_src_list, nz_lens_list, dens_slabs):
     m      = numpyro.sample("m", dist.Normal(np.zeros(N_SRC_BINS), 0.01 * np.ones(N_SRC_BINS)), rng_key=key)
     A_ia   = numpyro.sample("A_ia",   dist.Uniform(-5., 5.), rng_key=key)
     eta_ia = numpyro.sample("eta_ia", dist.Uniform(-5., 5.), rng_key=key)
-        
+    
+    kappa    = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs) 
+    kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, dens_slabs)
+
+    gamma    = get_gamma(kappa + kappa_ia)
+
     for i in range(N_SRC_BINS):
-        kappa = get_kappa(nz_src_list[i], Omega_m, Dz_src[i], dens_slabs)
-        kappa_IA = get_kappa_ia(nz_src_list[i], Omega_m, Dz_src[i], A_ia, eta_ia, dens_slabs)
-        gamma_1,    gamma_2 = F.kappa2gamma(kappa)
-        gamma_IA_1, gamma_IA_2 = F.kappa2gamma(kappa_IA)
-        numpyro.sample('e1_obs_%d'%(i+1), dist.Normal((1. + m[i]) * (gamma_1 + gamma_IA_1), sigma_noise), obs=shape_data[i][0])
-        numpyro.sample('e2_obs_%d'%(i+1), dist.Normal((1. + m[i]) * (gamma_2 + gamma_IA_2), sigma_noise), obs=shape_data[i][1])
+        numpyro.sample('e_obs_%d'%(i+1), dist.Normal((1. + m[i]) * gamma[i], sigma_noise), obs=shape_data[i])
 
     Dz_lens = numpyro.sample("Dz_lens", dist.Normal(np.zeros(N_LENS_BINS), 0.01 * np.ones(N_LENS_BINS)), rng_key=key)
     bg      = numpyro.sample("bg", dist.Normal(np.ones(N_LENS_BINS), 0.1 * np.ones(N_LENS_BINS)), rng_key=key)
@@ -177,11 +184,11 @@ def density_slab_model(nz_src_list, nz_lens_list, dens_slabs):
         proj_density = get_proj_density(nz_lens_list[i], Dz_lens[i], dens_slabs)
         mu = np.clip(nbar * (1. + bg[i] * proj_density), 1e-3) 
         numpyro.sample('Ng_%d'%(i+1), dist.Poisson(mu), obs=N_gals_data[i])
-        
+ 
 kernel = NUTS(density_slab_model, target_accept_prob=0.65)
 mcmc   = MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples)
 
-mcmc.run(rng_key_, nz_src_list, nz_lens_list, dens_slabs)
+mcmc.run(rng_key_, nz_src_list, nz_lens_list)
 
     
 samples = mcmc.get_samples()

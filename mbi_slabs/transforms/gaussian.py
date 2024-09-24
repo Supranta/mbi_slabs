@@ -1,4 +1,5 @@
 import jax.numpy as np
+from jax import vmap, jit
 from .map_tools import MapTools
 
 def powerlaw(k, A, alpha):
@@ -12,13 +13,11 @@ class GaussianTransform:
         self.L         = L
         A_fid, alpha_fid = 4., -1.
         self.set_Pk_arr(A_fid, alpha_fid)
-        
+        self.fourier2map_slabs = jit(vmap(self.map_tools.fourier2map))
+
     def x2G(self, x_l):
         y_l = x_l * np.sqrt(self.Pk_arr)
-        y_map = np.zeros((self.N_slabs, self.N_grid, self.N_grid))
-        for i in range(self.N_slabs):
-            y_map_i = self.map_tools.fourier2map(y_l[i])
-            y_map   = y_map.at[i].set(y_map_i)
+        y_map = self.fourier2map_slabs(y_l)
         return y_map
 
     def set_Pk_arr(self, A, alpha):
