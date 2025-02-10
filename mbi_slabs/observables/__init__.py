@@ -1,1 +1,1 @@
-from .redshift_dist import HistogramDist 
+from .redshift_dist import HistogramDist, ObservableCalculator 

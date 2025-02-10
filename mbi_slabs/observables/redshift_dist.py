@@ -79,3 +79,32 @@ class HistogramDist(RedshiftDist):
         term2 = self._kappa_mixing_matrix(linear_z_intercept, linear_z_slope, chi_lim_lo2, chi_lim_hi, chi_grid)
     
         return prefactor * (term2 - term1)
+    
+class ObservableCalculator:
+    def __init__(self, z_slabs, C_cr=0.013877, z0=0.62):
+        self.z_slabs = z_slabs
+        self.C_cr = C_cr
+        self.z0 = z0
+    
+    def A2C(self, A1, eta=0., OmegaM=0.3):
+        """
+        Calculate C1 parameter according to Eqn 15 of 1811.06989
+        """
+        C1 = -A1 * self.C_cr * OmegaM * ((1. + self.z_slabs)/(1. + self.z0))**eta
+        return C1
+    
+    def get_kappa(self, nz, Omega_m, Delta_z, dens_slabs):
+        """Calculate kappa (lensing convergence) for given density slabs"""
+        weights = nz.get_slab_weights_kappa(Omega_m, Delta_z)
+        return np.sum((weights * dens_slabs), axis=0)
+    
+    def get_proj_density(self, nz, Delta_z, dens_slabs):
+        """Calculate projected density for given density slabs"""
+        weights = nz.get_slab_weights_proj_density(Delta_z)
+        return np.sum((weights * dens_slabs), axis=0)
+    
+    def get_kappa_ia(self, nz, Omega_m, Delta_z, A1, eta, dens_slabs):
+        """Calculate intrinsic alignment contribution to kappa"""
+        C_ia = self.A2C(A1, eta, Omega_m)
+        weights = C_ia[:,np.newaxis,np.newaxis] * nz.get_slab_weights_proj_density(Delta_z)
+        return np.sum((weights * dens_slabs), axis=0)

@@ -20,9 +20,9 @@ def get_slabs_z_boundaries(cosmo_fid, z_grid, slab_definition):
 
 def get_all_slabs(N_slabs=24, randomize=True, Gaussian_sim=False):
     if Gaussian_sim:
-        filename = '/spiff/ssarnabo/N_body_sims/MDR1/dens_512_gaussian.npy'
+        filename = 'data/sims/dens_512_gaussian.npy'
     else:
-        filename = '/spiff/ssarnabo/N_body_sims/MDR1/dens_512_mdr1.npy'
+        filename = 'data/sims/dens_512_mdr1.npy'
     dens_3d = onp.load(filename)
     dens_2d_slabs = []
     for i in range(8):
@@ -67,4 +67,4 @@ class FourierTransforms:
         gamma_1 =  np.fft.ifftn(gamma_1_l).real
         gamma_2 =  np.fft.ifftn(gamma_2_l).real
     
-        return gamma_1, gamma_2
+        return np.stack([gamma_1, gamma_2])
