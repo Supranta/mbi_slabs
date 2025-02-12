@@ -18,6 +18,7 @@ slab_params     = config.get_slab_config()
 observables     = config.get_observables()
 sampling_params = config.get_sampling_config()
 output_dir      = config.get_output_dir()
+data_config     = config.get_data_config()
 
 slab_definition = [slab_params.chi_min, slab_params.chi_max, slab_params.slab_width]
 
@@ -38,11 +39,10 @@ obs_calc = ObservableCalculator(z_slabs)
 N_LENS_BINS = len(catalogs.nz_lens_list)
 N_SRC_BINS  = len(catalogs.nz_src_list) 
 
-sigma_noise = 0.05 
-l = (slab_params.L / slab_params.N_grid)
-nbar        = 10e-4 * l**2 * slab_params.slab_width 
+l           = (slab_params.L / slab_params.N_grid)
+nbar        = data_config.nbar_Mpc3 * l**2 * slab_params.slab_width 
 
-shape_data, counts_data = read_data(output_dir)
+shape_data, counts_data = read_data(data_config.datafile)
 
 import numpyro
 import numpyro.distributions as dist
@@ -52,7 +52,7 @@ key = jax.random.PRNGKey(onp.random.randint(1000000))
 rng_key, rng_key_ = jax.random.split(key)
 
 sampler = MCMCSampler(transform, F, obs_calc, N_slabs, slab_params.N_grid, 
-                      sigma_noise, nbar)
+                      data_config.sigma_e, nbar)
 
 # Setup and run MCMC
 model = sampler.setup_model(N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key)
@@ -64,4 +64,3 @@ samples = sampler.run_mcmc(model,
 
 # Save samples
 sampler.save_samples(samples, output_dir, sampling_params.n_samples)
-
