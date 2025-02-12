@@ -27,6 +27,12 @@ class MCMCSampler:
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
+        def numpyro_sample(prior, x, key):
+            if isinstance(prior[x], dict):
+                return numpyro.deterministic(x, prior[x]['value'])
+            else:
+                return numpyro.sample(x, prior[x], rng_key=key)
+
         def density_slab_model(nz_src_list, nz_lens_list, prior):
             x_l = numpyro.sample("x_l", 
                                dist.Normal(np.zeros((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1)), 
@@ -35,12 +41,12 @@ class MCMCSampler:
             dens_slabs = self.transform.x2G(x_l)
             
             # Sample parameters
-            Dz_src = numpyro.sample("Dz_src", prior['Dz_src'], rng_key=key)
-            m = numpyro.sample("m", prior['m'], rng_key=key)
-            A_ia = numpyro.sample("A_ia", prior['A_ia'], rng_key=key)
-            eta_ia = numpyro.sample("eta_ia", prior['eta_ia'], rng_key=key)
-            Dz_lens = numpyro.sample("Dz_lens", prior['Dz_lens'], rng_key=key)
-            bg = numpyro.sample("bg", prior['bg'], rng_key=key)
+            Dz_src  = numpyro_sample(prior, 'Dz_src', key)
+            m       = numpyro_sample(prior, 'm', key)
+            A_ia    = numpyro_sample(prior, 'A_ia', key)
+            eta_ia  = numpyro_sample(prior, 'eta_ia', key)
+            Dz_lens = numpyro_sample(prior, 'Dz_lens', key)
+            bg      = numpyro_sample(prior, 'bg', key)
 
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)

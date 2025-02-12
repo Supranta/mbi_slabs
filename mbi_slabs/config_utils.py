@@ -60,7 +60,7 @@ class PriorConfig:
 
     def get_prior_dist(self, prior_config, param):
         prior_dist = prior_config[param]['dist'].lower() 
-        assert prior_dist in ['normal', 'uniform'], "Provided distribution not currently supported"
+        assert prior_dist in ['normal', 'uniform', 'deterministic'], "Provided distribution not currently supported"
         print(prior_config[param])
         if(prior_dist == 'normal'):
             mean = self.check_type_and_convert(prior_config[param]['mean'])
@@ -70,6 +70,9 @@ class PriorConfig:
             low  = self.check_type_and_convert(prior_config[param]['low'])
             high = self.check_type_and_convert(prior_config[param]['high'])
             return dist.Uniform(low, high)
+        if(prior_dist == 'deterministic'):
+            value = self.check_type_and_convert(prior_config[param]['value'])
+            return {'value': value}
 
 class ConfigLoader:
     def __init__(self, config_file: str):
