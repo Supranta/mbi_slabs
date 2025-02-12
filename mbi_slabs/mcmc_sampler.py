@@ -27,7 +27,7 @@ class MCMCSampler:
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
-        def density_slab_model(nz_src_list, nz_lens_list):
+        def density_slab_model(nz_src_list, nz_lens_list, prior):
             x_l = numpyro.sample("x_l", 
                                dist.Normal(np.zeros((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1)), 
                                          np.ones((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))), 
@@ -35,12 +35,12 @@ class MCMCSampler:
             dens_slabs = self.transform.x2G(x_l)
             
             # Sample parameters
-            Dz_src = numpyro.sample("Dz_src", dist.Normal(np.zeros(N_SRC_BINS), 0.01 * np.ones(N_SRC_BINS)), rng_key=key)
-            m = numpyro.sample("m", dist.Normal(np.zeros(N_SRC_BINS), 0.01 * np.ones(N_SRC_BINS)), rng_key=key)
-            A_ia = numpyro.sample("A_ia", dist.Uniform(-5., 5.), rng_key=key)
-            eta_ia = numpyro.sample("eta_ia", dist.Uniform(-5., 5.), rng_key=key)
-            Dz_lens = numpyro.sample("Dz_lens", dist.Normal(np.zeros(N_LENS_BINS), 0.01 * np.ones(N_LENS_BINS)), rng_key=key)
-            bg = numpyro.sample("bg", dist.Normal(np.ones(N_LENS_BINS), 0.1 * np.ones(N_LENS_BINS)), rng_key=key)
+            Dz_src = numpyro.sample("Dz_src", prior['Dz_src'], rng_key=key)
+            m = numpyro.sample("m", prior['m'], rng_key=key)
+            A_ia = numpyro.sample("A_ia", prior['A_ia'], rng_key=key)
+            eta_ia = numpyro.sample("eta_ia", prior['eta_ia'], rng_key=key)
+            Dz_lens = numpyro.sample("Dz_lens", prior['Dz_lens'], rng_key=key)
+            bg = numpyro.sample("bg", prior['bg'], rng_key=key)
 
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)
@@ -60,10 +60,10 @@ class MCMCSampler:
 
         return density_slab_model
 
-    def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, rng_key):
+    def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, prior, rng_key):
         kernel = NUTS(model, target_accept_prob=0.65, max_tree_depth=sampling_params.nuts_tree_depth)
         mcmc = MCMC(kernel, num_warmup=sampling_params.n_warmup, num_samples=sampling_params.n_samples)
-        mcmc.run(rng_key, nz_src_list, nz_lens_list)
+        mcmc.run(rng_key, nz_src_list, nz_lens_list, prior)
         return mcmc.get_samples()
 
     def save_samples(self, samples, output_dir, n_samples):

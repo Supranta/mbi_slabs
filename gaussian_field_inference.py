@@ -19,6 +19,7 @@ observables     = config.get_observables()
 sampling_params = config.get_sampling_config()
 output_dir      = config.get_output_dir()
 data_config     = config.get_data_config()
+prior_config    = config.get_prior_config()
 
 slab_definition = [slab_params.chi_min, slab_params.chi_max, slab_params.slab_width]
 
@@ -60,6 +61,7 @@ samples = sampler.run_mcmc(model,
                             sampling_params,
                             catalogs.nz_src_list, 
                             catalogs.nz_lens_list,
+                            prior_config.prior,
                             rng_key_)
 
 # Save samples
