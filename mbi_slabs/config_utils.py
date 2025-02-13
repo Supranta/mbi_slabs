@@ -20,6 +20,8 @@ class SamplingConfig:
     n_warmup: int
     n_samples: int
     nuts_tree_depth: int
+    burnin_samples: int
+    burnin_warmup: int
     sample_cosmo: bool
 
 @dataclass
@@ -61,7 +63,6 @@ class PriorConfig:
     def get_prior_dist(self, prior_config, param):
         prior_dist = prior_config[param]['dist'].lower() 
         assert prior_dist in ['normal', 'uniform', 'deterministic'], "Provided distribution not currently supported"
-        print(prior_config[param])
         if(prior_dist == 'normal'):
             mean = self.check_type_and_convert(prior_config[param]['mean'])
             std  = self.check_type_and_convert(prior_config[param]['std'])
@@ -93,6 +94,8 @@ class ConfigLoader:
         mcmc_config = self.config['sampling']['mcmc']
         return SamplingConfig(n_warmup=mcmc_config['n_warmup'],
                             n_samples=mcmc_config['n_samples'],
+                            burnin_samples=1,
+                            burnin_warmup=100,
                             nuts_tree_depth=mcmc_config['nuts_tree_depth'],
                             sample_cosmo=self.config['sampling']['sample_cosmo'])
                                                                                                                                             

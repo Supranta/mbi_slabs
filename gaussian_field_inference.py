@@ -54,15 +54,27 @@ rng_key, rng_key_ = jax.random.split(key)
 
 sampler = MCMCSampler(transform, F, obs_calc, N_slabs, slab_params.N_grid, 
                       data_config.sigma_e, nbar)
-
-# Setup and run MCMC
+# run burnin MCMC
+print("Running a burnin chain...")
 model = sampler.setup_model(N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key)
+
+burnin_sample = sampler.run_mcmc(model,
+                                    sampling_params,
+                                    catalogs.nz_src_list,
+                                    catalogs.nz_lens_list,
+                                    prior_config.prior,
+                                    rng_key_)
+
+init_values = sampler.get_init_sample(burnin_sample)
+# Setup and run MCMC
+sampler.set_burn_in(False)
 samples = sampler.run_mcmc(model, 
                             sampling_params,
                             catalogs.nz_src_list, 
                             catalogs.nz_lens_list,
                             prior_config.prior,
-                            rng_key_)
+                            rng_key_,
+                            init_values=init_values)
 
 # Save samples
 sampler.save_samples(samples, output_dir, sampling_params.n_samples)

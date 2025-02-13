@@ -15,7 +15,8 @@ class MCMCSampler:
         self.N_grid = N_grid
         self.sigma_noise = sigma_noise
         self.nbar = nbar
-        
+        self.burn_in = True
+
     def setup_model(self, N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key):
         def get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs):
             kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], 0.3, Dz_src[i], dens_slabs) 
@@ -40,13 +41,21 @@ class MCMCSampler:
                                rng_key=key)
             dens_slabs = self.transform.x2G(x_l)
             
-            # Sample parameters
-            Dz_src  = numpyro_sample(prior, 'Dz_src', key)
-            m       = numpyro_sample(prior, 'm', key)
-            A_ia    = numpyro_sample(prior, 'A_ia', key)
-            eta_ia  = numpyro_sample(prior, 'eta_ia', key)
-            Dz_lens = numpyro_sample(prior, 'Dz_lens', key)
-            bg      = numpyro_sample(prior, 'bg', key)
+            if(self.burn_in):
+                Dz_src  = numpyro.deterministic('Dz_src', np.zeros(N_SRC_BINS))
+                m       = numpyro.deterministic('m', np.zeros(N_SRC_BINS))
+                A_ia    = numpyro.deterministic('A_ia', 0.)
+                eta_ia  = numpyro.deterministic('eta_ia', 0.)
+                Dz_lens = numpyro.deterministic('Dz_lens', np.zeros(N_LENS_BINS))
+                bg      = numpyro.deterministic('bg', np.ones(N_LENS_BINS))
+            else:
+                # Sample parameters
+                Dz_src  = numpyro_sample(prior, 'Dz_src', key)
+                m       = numpyro_sample(prior, 'm', key)
+                A_ia    = numpyro_sample(prior, 'A_ia', key)
+                eta_ia  = numpyro_sample(prior, 'eta_ia', key)
+                Dz_lens = numpyro_sample(prior, 'Dz_lens', key)
+                bg      = numpyro_sample(prior, 'bg', key)
 
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)
@@ -66,11 +75,37 @@ class MCMCSampler:
 
         return density_slab_model
 
-    def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, prior, rng_key):
-        kernel = NUTS(model, target_accept_prob=0.65, max_tree_depth=sampling_params.nuts_tree_depth)
-        mcmc = MCMC(kernel, num_warmup=sampling_params.n_warmup, num_samples=sampling_params.n_samples)
+    def set_burn_in(self, burn_in):
+        self.burn_in = burn_in
+
+    def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, prior, rng_key, init_values=None):
+        if(self.burn_in):
+            n_samples, n_warmup = sampling_params.burnin_samples, sampling_params.burnin_warmup
+            nuts_tree_depth = 9
+        else:
+            n_samples, n_warmup = sampling_params.n_samples, sampling_params.n_warmup
+            nuts_tree_depth = sampling_params.nuts_tree_depth
+        
+        if init_values is not None:
+            def init_strategy(rng_key, *args, **kwargs):
+                return init_values
+        else:
+            init_strategy = None
+        
+        kernel = NUTS(model, target_accept_prob=0.65, max_tree_depth=nuts_tree_depth)
+        
+        if init_values is not None:
+            kernel.init_strategy = init_strategy
+        
+        mcmc = MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples)
         mcmc.run(rng_key, nz_src_list, nz_lens_list, prior)
         return mcmc.get_samples()
+
+    def get_init_sample(self, sample):
+        return_sample = {}
+        for x in sample:
+            return_sample[x] = sample[x][0]
+        return return_sample
 
     def save_samples(self, samples, output_dir, n_samples):
         for i in trange(n_samples):
