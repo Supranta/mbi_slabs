@@ -9,8 +9,10 @@ import numpy as np
 configfile = sys.argv[1]
 config = ConfigLoader(configfile)
 
+slab_params     = config.get_slab_config()
 sampling_params = config.get_sampling_config()
 output_dir      = config.get_output_dir()
+data_config     = config.get_data_config()
 
 def get_field(x, scalar=False):
     y_list = []
@@ -154,3 +156,65 @@ ax[1,2].plot(lag_arr, autocorr_ia[1], color=cm.viridis(1/2))
 plt.tight_layout()
 plt.savefig(output_dir + '/autocorr_chains.png')
 plt.close()
+
+#============== Plot for neighboring slab correlations ==================
+
+def get_slab_list(ind1, ind2):
+    delta_list_1 = []
+    delta_list_2 = []
+    for i in trange(sampling_params.n_samples):
+        with h5.File(output_dir + '/mcmc_%d.h5'%(i), 'r') as f:
+            dens = f['slab_dens'][:]
+        delta_list_1.append(dens[ind1])
+        delta_list_2.append(dens[ind2])
+    return np.array(delta_list_1), np.array(delta_list_2)
+
+def get_cross_corr_neighboring_slabs(ind1, ind2):
+    delta_1, delta_2 = get_slab_list(ind1, ind2)
+
+    delta_mean_1 = np.mean(delta_1, axis=0)
+    delta_mean_2 = np.mean(delta_2, axis=0)
+
+    sigma1 = np.std(delta_1, axis=0)
+    sigma2 = np.std(delta_2, axis=0)
+                    
+    delta_cross_variance = np.mean((delta_1 - delta_mean_1) * (delta_2 - delta_mean_2), axis=0)
+    return delta_cross_variance / sigma1 / sigma2
+
+def plot_crosscorr_neighbors(delta_true, ind, savename=None):
+    ind1, ind2 = ind, ind + 1
+
+    rho_12 = get_cross_corr_neighboring_slabs(ind1, ind2)
+
+    delta_true_1 = delta_true[ind1]
+    delta_true_2 = delta_true[ind2]
+
+    fig, ax = plt.subplots(1,3,figsize=(11.,2.7))
+
+    ax[0].set_title("$\delta$ (bin %d)"%(ind1 + 1))
+    ax[1].set_title("Cross-correlation map")
+    ax[2].set_title("$\delta$ (bin %d)"%(ind2 + 1))
+
+    im0 = ax[0].imshow(delta_true_1, vmin=-1.5 * np.std(delta_true_1), vmax=1.5 * np.std(delta_true_1))
+    im1 = ax[1].imshow(rho_12, vmin=-0.2, vmax=0.1)
+    im2 = ax[2].imshow(delta_true_2, vmin=-1.5 * np.std(delta_true_2), vmax=1.5 * np.std(delta_true_2))
+
+    fig.colorbar(im0, ax=ax[0])
+    fig.colorbar(im1, ax=ax[1], label='Cross-correlation coeff')
+    fig.colorbar(im2, ax=ax[2])
+
+    plt.tight_layout()
+    if savename is not None:
+        plt.savefig(savename, dpi=150.)
+    plt.close()
+
+with h5.File(data_config.datafile, 'r') as f:
+    delta_true = f['delta_slabs'][:]
+
+import os
+N_slabs = 25
+for i in range(N_slabs):
+    print("i: %d"%(i+1))
+    savename = output_dir + '/neighboring_slab_corr_%d.png'%(i+1) 
+    plot_crosscorr_neighbors(delta_true, i, savename)
+# =============================================================
