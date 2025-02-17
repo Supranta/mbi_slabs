@@ -1,9 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import h5py as h5
 from tqdm import trange
+from matplotlib import cm
 import sys
 from mbi_slabs import *
+import numpy as np
 
 configfile = sys.argv[1]
 config = ConfigLoader(configfile)
@@ -96,4 +97,60 @@ savename = output_dir + '/src_trace.png'
 plot_src_trace(Dz_src, m, savename)
 
 savename = output_dir + '/ia_trace.png'
-plot_ia(A_ia, eta_ia, savename)    
+plot_ia(A_ia, eta_ia, savename)   
+
+#=============== Plot autocorrelation =================
+print(np.__file__)
+def _chain_autocorr(samples, max_lag=100):
+    time_arr = np.arange(max_lag)    
+    auto_corr_arr = np.zeros((max_lag))
+    for t in time_arr:
+        auto_corr_arr[t] = np.corrcoef(np.array([samples[:len(samples)-t], samples[t:len(samples)]]))[0,1]                                                
+    return auto_corr_arr
+
+def get_sample_autocorr(samples, max_lag=100):
+    autocorr_list = []
+    for chain in samples:
+        autocorr_i = _chain_autocorr(chain, max_lag)
+        autocorr_list.append(autocorr_i)
+    return np.array(autocorr_list)
+
+autocorr_Dz_lens = get_sample_autocorr(Dz_lens.T)
+autocorr_bg      = get_sample_autocorr(bg.T)
+
+autocorr_Dz_src = get_sample_autocorr(Dz_src.T)
+autocorr_m      = get_sample_autocorr(m.T)
+
+autocorr_ia      = get_sample_autocorr(np.array([A_ia, eta_ia]))
+
+lag_arr = np.arange(100)
+
+fig, ax = plt.subplots(2,3,figsize=(10., 5.))
+
+ax[0,2].axis('off')
+ax[0,0].set_title("$\Delta^{L}_z$ autocorrelation")
+ax[0,1].set_title("$b_g$ autocorrelation")
+ax[1,0].set_title("$\Delta^{S}_z$ autocorrelation")
+ax[1,1].set_title("$m$ autocorrelation")
+ax[1,2].set_title("IA parameter autocorrelation")
+
+for j in range(2):
+    ax[j,0].set_ylabel('Correlation length')
+for j in range(3):
+    ax[0,j].set_xticks([])
+    ax[1,j].set_xlabel('Lag')
+
+for i in range(N_LENS_BINS):
+    ax[0,0].plot(lag_arr, autocorr_Dz_lens[i], color=cm.viridis(i/N_LENS_BINS))
+    ax[0,1].plot(lag_arr, autocorr_bg[i], color=cm.viridis(i/N_LENS_BINS))
+
+for i in range(N_SRC_BINS):
+    ax[1,0].plot(lag_arr, autocorr_Dz_src[i], color=cm.viridis(i/N_SRC_BINS))
+    ax[1,1].plot(lag_arr, autocorr_m[i], color=cm.viridis(i/N_SRC_BINS))
+
+ax[1,2].plot(lag_arr, autocorr_ia[0], color=cm.viridis(0/2))
+ax[1,2].plot(lag_arr, autocorr_ia[1], color=cm.viridis(1/2))
+
+plt.tight_layout()
+plt.savefig(output_dir + '/autocorr_chains.png')
+plt.close()
