@@ -20,9 +20,8 @@ class SamplingConfig:
     n_warmup: int
     n_samples: int
     nuts_tree_depth: int
-    burnin_samples: int
     burnin_warmup: int
-    sample_cosmo: bool
+    num_sampling_iterations: int
 
 @dataclass
 class DataConfig:
@@ -94,10 +93,9 @@ class ConfigLoader:
         mcmc_config = self.config['sampling']['mcmc']
         return SamplingConfig(n_warmup=mcmc_config['n_warmup'],
                             n_samples=mcmc_config['n_samples'],
-                            burnin_samples=1,
                             burnin_warmup=100,
                             nuts_tree_depth=mcmc_config['nuts_tree_depth'],
-                            sample_cosmo=self.config['sampling']['sample_cosmo'])
+                            num_sampling_iterations=mcmc_config['num_sampling_iterations'])
                                                                                                                                             
     def get_data_config(self) -> DataConfig:
         data_config = self.config['data']

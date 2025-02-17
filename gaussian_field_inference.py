@@ -78,3 +78,18 @@ samples = sampler.run_mcmc(model,
 
 # Save samples
 sampler.save_samples(samples, output_dir, sampling_params.n_samples)
+n_start = sampling_params.n_samples
+for n in range(sampling_params.num_sampling_iterations):
+    print("Running additional sampling iteration # %d"%(n+1))
+    sample_start = sampler.get_init_sample(samples)
+    samples = sampler.run_mcmc(model,
+                                sampling_params,
+                                catalogs.nz_src_list,
+                                catalogs.nz_lens_list,
+                                prior_config.prior,
+                                rng_key_,
+                                last_state=sampler.last_state
+                                )
+    sampler.save_samples(samples, output_dir, sampling_params.n_samples, n_start)
+    n_start = n_start + sampling_params.n_samples
+
