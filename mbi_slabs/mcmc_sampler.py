@@ -111,11 +111,12 @@ class MCMCSampler:
             return_sample[x] = sample[x][-1]
         return return_sample
 
-    def save_samples(self, samples, output_dir, n_samples, n_start=0):
+    def save_samples(self, samples, io_config, n_samples, n_start=0):
         for i in trange(n_samples):
-            dens_slabs_sample = self.transform.x2G(samples['x_l'][i])
-            with h5.File(f'{output_dir}/mcmc_{i + n_start}.h5', 'w') as f:
-                f['slab_dens'] = dens_slabs_sample
+            with h5.File(f'{io_config.output_dir}/mcmc_{i + n_start}.h5', 'w') as f:
+                if(io_config.save_maps):
+                    dens_slabs_sample = self.transform.x2G(samples['x_l'][i])
+                    f['slab_dens'] = dens_slabs_sample
                 f['bg'] = samples['bg'][i]
                 f['m'] = samples['m'][i]
                 f['Dz_src'] = samples['Dz_src'][i]

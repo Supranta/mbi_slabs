@@ -24,6 +24,11 @@ class SamplingConfig:
     num_sampling_iterations: int
 
 @dataclass
+class IOConfig:
+    output_dir: str
+    save_maps: bool
+
+@dataclass
 class DataConfig:
     A_ia: float
     sigma_e: float
@@ -104,8 +109,10 @@ class ConfigLoader:
                             nbar_Mpc3=data_config['nbar_Mpc3'],
                             A_ia=data_config['A_ia'])
 
-    def get_output_dir(self) -> str:
-        return self.config['io']['output_dir']
+    def get_io_config(self) -> IOConfig:
+        io_config = self.config['io']
+        return IOConfig(output_dir=io_config['output_dir'],
+                        save_maps=io_config['save_maps'])
                                                                                                                                                             
     def get_observables(self) -> Dict[str, Any]:
         return self.config['observables']

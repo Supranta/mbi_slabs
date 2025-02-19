@@ -17,9 +17,9 @@ config = ConfigLoader(configfile)
 slab_params     = config.get_slab_config()
 observables     = config.get_observables()
 sampling_params = config.get_sampling_config()
-output_dir      = config.get_output_dir()
 data_config     = config.get_data_config()
 prior_config    = config.get_prior_config()
+io_config       = config.get_io_config()
 
 slab_definition = [slab_params.chi_min, slab_params.chi_max, slab_params.slab_width]
 
@@ -77,7 +77,7 @@ samples = sampler.run_mcmc(model,
                             init_values=init_values)
 
 # Save samples
-sampler.save_samples(samples, output_dir, sampling_params.n_samples)
+sampler.save_samples(samples, io_config, sampling_params.n_samples)
 n_start = sampling_params.n_samples
 for n in range(sampling_params.num_sampling_iterations):
     print("Running additional sampling iteration # %d"%(n+1))
@@ -90,6 +90,6 @@ for n in range(sampling_params.num_sampling_iterations):
                                 rng_key_,
                                 last_state=sampler.last_state
                                 )
-    sampler.save_samples(samples, output_dir, sampling_params.n_samples, n_start)
+    sampler.save_samples(samples, io_config, sampling_params.n_samples, n_start)
     n_start = n_start + sampling_params.n_samples
 
