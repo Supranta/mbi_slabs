@@ -15,8 +15,8 @@ class GaussianTransform:
         self.set_Pk_arr(A_fid, alpha_fid)
         self.fourier2map_slabs = jit(vmap(self.map_tools.fourier2map))
 
-    def x2G(self, x_l):
-        y_l = x_l * np.sqrt(self.Pk_arr)
+    def x2G(self, x_l, A_cosmo):
+        y_l = x_l * np.sqrt(A_cosmo * self.Pk_arr)
         y_map = self.fourier2map_slabs(y_l)
         return y_map
 

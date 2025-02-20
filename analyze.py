@@ -31,8 +31,10 @@ cosmo = get_cosmo(0.3)
 slab_params     = config.get_slab_config()
 observables     = config.get_observables()
 sampling_params = config.get_sampling_config()
-output_dir      = config.get_output_dir()
+io_config       = config.get_io_config()
 data_config     = config.get_data_config()
+
+output_dir = io_config.output_dir
 
 # Initialize catalogs
 catalog_init = CatalogInitializer()

@@ -98,7 +98,7 @@ class ConfigLoader:
         mcmc_config = self.config['sampling']['mcmc']
         return SamplingConfig(n_warmup=mcmc_config['n_warmup'],
                             n_samples=mcmc_config['n_samples'],
-                            burnin_warmup=100,
+                            burnin_warmup=500,
                             nuts_tree_depth=mcmc_config['nuts_tree_depth'],
                             num_sampling_iterations=mcmc_config['num_sampling_iterations'])
                                                                                                                                             
