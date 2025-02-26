@@ -14,6 +14,12 @@ class SlabConfig:
     slab_width: float
     N_grid: int
     L: float
+    transform: str
+
+    def __post_init__(self):
+        valid_transforms = ["gaussian", "lognormal"]
+        if self.transform not in valid_transforms:
+            raise ValueError(f"transform must be one of {valid_transforms}, got {self.transform}")
 
 @dataclass
 class SamplingConfig:
@@ -23,6 +29,7 @@ class SamplingConfig:
     burnin_warmup: int
     num_sampling_iterations: int
 
+    
 @dataclass
 class IOConfig:
     output_dir: str

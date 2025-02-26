@@ -3,7 +3,7 @@ import sys
 from mbi_slabs.utils import *
 from mbi_slabs import *
 from mbi_slabs.observables import *
-from mbi_slabs.transforms import GaussianTransform
+from mbi_slabs.transforms import GaussianTransform, LogNormalTransform
 from mbi_slabs.transforms import MapTools
 
 configfile = sys.argv[1]
@@ -33,7 +33,10 @@ catalogs = catalog_init.create_catalogs(observables)
 
 N_slabs = z_slabs.shape[0]
 
-transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L)
+if(slab_params.transform=='gaussian'):
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L)
+elif(slab_params.transform=='lognormal'):
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L)
 
 obs_calc = ObservableCalculator(z_slabs)
 
@@ -66,6 +69,7 @@ burnin_sample = sampler.run_mcmc(model,
                                     rng_key_)
 
 init_values = sampler.get_init_sample(burnin_sample)
+del burnin_sample
 # Setup and run MCMC
 sampler.set_burn_in(False)
 samples = sampler.run_mcmc(model, 
@@ -81,7 +85,7 @@ sampler.save_samples(samples, io_config, sampling_params.n_samples)
 n_start = sampling_params.n_samples
 for n in range(sampling_params.num_sampling_iterations):
     print("Running additional sampling iteration # %d"%(n+1))
-    sample_start = sampler.get_init_sample(samples)
+    del samples
     samples = sampler.run_mcmc(model,
                                 sampling_params,
                                 catalogs.nz_src_list,

@@ -3,7 +3,7 @@ import sys
 from mbi_slabs.utils import *
 from mbi_slabs import *
 from mbi_slabs.observables import *
-from mbi_slabs.transforms import GaussianTransform
+from mbi_slabs.transforms import GaussianTransform, LogNormalTransform
 from mbi_slabs.transforms import MapTools
 
 EnvironmentSetup.setup_jax_env()
@@ -16,8 +16,10 @@ config = ConfigLoader(configfile)
 slab_params     = config.get_slab_config()
 observables     = config.get_observables()
 sampling_params = config.get_sampling_config()
-output_dir      = config.get_output_dir()
+io_config       = config.get_io_config()
 data_config     = config.get_data_config()
+
+output_dir = io_config.output_dir
 
 slab_definition = [slab_params.chi_min, slab_params.chi_max, slab_params.slab_width]
 
@@ -31,10 +33,13 @@ catalogs     = catalog_init.create_catalogs(observables)
 
 N_slabs = z_slabs.shape[0]
 
-transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L)
+if(slab_params.transform == "gaussian"):
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L)
+elif(slab_params.transform == "lognormal"):
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L)
 
 x_l             = np.array(onp.random.normal(size=(N_slabs, 2, slab_params.N_grid, slab_params.N_grid//2 + 1))) 
-dens_slabs_true = transform.x2G(x_l)
+dens_slabs_true = transform.x2G(x_l, 1.)
     
 obs_calc = ObservableCalculator(z_slabs)
 
