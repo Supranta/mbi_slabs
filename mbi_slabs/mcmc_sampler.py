@@ -57,7 +57,7 @@ class MCMCSampler:
                                dist.Normal(np.zeros((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1)), 
                                             np.ones((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))), 
                                rng_key=key)
-            dens_slabs = self.transform.x2G(x_l, A_cosmo)
+            dens_slabs = self.transform.x2delta(x_l, A_cosmo)
 
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)
@@ -124,6 +124,6 @@ class MCMCSampler:
                 f['A_ia']    = samples['A_ia'][i]
                 f['eta_ia']  = samples['eta_ia'][i]
                 if(io_config.save_maps):
-                    dens_slabs_sample = self.transform.x2G(samples['x_l'][i], samples['A_cosmo'][i])
+                    dens_slabs_sample = self.transform.x2delta(samples['x_l'][i], samples['A_cosmo'][i])
                     f['slab_dens'] = dens_slabs_sample
                 

@@ -34,9 +34,9 @@ catalogs = catalog_init.create_catalogs(observables)
 N_slabs = z_slabs.shape[0]
 
 if(slab_params.transform=='gaussian'):
-    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L)
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, z_slabs)
 elif(slab_params.transform=='lognormal'):
-    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L)
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, z_slabs)
 
 obs_calc = ObservableCalculator(z_slabs)
 
