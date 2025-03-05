@@ -12,11 +12,7 @@ class Transform:
         self.map_tools = MapTools(N_grid, L)
         self.N_grid    = N_grid
         self.N_slabs   = N_slabs
-        self.L         = L
-        
-        self.pk_emu = PkEmulator(pk_emu_file)
-
-        self.log_k_slabs  = np.log(self.pk_emu.k)        
+        self.L         = L       
 
         self.k_mask = np.ones_like(self.map_tools.ell, dtype=bool)
         self.k_mask = self.k_mask.at[0, 0].set(False)
@@ -48,9 +44,11 @@ class Transform:
         return Pk_arr * self.map_tools.Omega_s
 
 class GaussianTransform(Transform):
-    def __init__(self, N_slabs, N_grid, L, Pk_slabs):
-        super().__init__(N_slabs, N_grid, L, Pk_slabs)
-        
+    def __init__(self, N_slabs, N_grid, L, pk_emu_file):
+        super().__init__(N_slabs, N_grid, L, pk_emu_file)
+        self.pk_emu = PkEmulator(pk_emu_file, False)
+        self.log_k_slabs  = np.log(self.pk_emu.k) 
+    
     def x2delta(self, x_l, theta_cosmo):
         Pk_arr    = self.get_Pk_arr(theta_cosmo)
         delta_l   = x_l * np.sqrt(Pk_arr)
@@ -58,13 +56,16 @@ class GaussianTransform(Transform):
         return delta_map
 
 class LogNormalTransform(Transform):
-    def __init__(self, N_slabs, N_grid, L, Pk_slabs):
-        super().__init__(N_slabs, N_grid, L, Pk_slabs)
-        self.mu = self.mu[:,np.newaxis,np.newaxis]
+    def __init__(self, N_slabs, N_grid, L, pk_emu_file):
+        super().__init__(N_slabs, N_grid, L, pk_emu_file)
+        self.pk_emu = PkEmulator(pk_emu_file, True)
+        self.log_k_slabs  = np.log(self.pk_emu.k) 
 
-    def x2delta(self, x_l, A_cosmo):
-        y_l = x_l * np.sqrt(A_cosmo * self.Pk_arr)
-        y_map = self.fourier2map_slabs(y_l)
-        delta_map = np.exp(y_map + A_cosmo * self.mu) - 1.
+    def x2delta(self, x_l, theta_cosmo):
+        Pk_arr = self.get_Pk_arr(theta_cosmo)
+        y_l    = x_l * np.sqrt(Pk_arr)
+        y_map  = self.fourier2map_slabs(y_l)
+        y_mean = self.pk_emu.get_y_mean(theta_cosmo)[:,np.newaxis,np.newaxis]
+        delta_map = np.exp(y_map + y_mean) - 1.
         return delta_map
 

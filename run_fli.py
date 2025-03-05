@@ -37,7 +37,7 @@ N_slabs = z_slabs.shape[0]
 if(slab_params.transform=='gaussian'):
     transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
 elif(slab_params.transform=='lognormal'):
-    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.Pk_slabs)
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
 
 obs_calc = ObservableCalculator(z_slabs)
 
@@ -59,6 +59,7 @@ rng_key, rng_key_ = jax.random.split(key)
 sampler = MCMCSampler(transform, F, obs_calc, N_slabs, slab_params.N_grid, 
                       data_config.sigma_e, nbar)
 # run burnin MCMC
+sampler.set_cosmo_distances(slab_params.cosmo_distance)
 print("Running a burnin chain...")
 model = sampler.setup_model(N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key)
 
@@ -73,6 +74,7 @@ init_values = sampler.get_init_sample(burnin_sample)
 del burnin_sample
 # Setup and run MCMC
 sampler.set_burn_in(False)
+
 samples = sampler.run_mcmc(model, 
                             sampling_params,
                             catalogs.nz_src_list, 

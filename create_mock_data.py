@@ -38,7 +38,7 @@ N_slabs = z_slabs.shape[0]
 if(slab_params.transform == "gaussian"):
     transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
 elif(slab_params.transform == "lognormal"):
-    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.Pk_slabs)
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
 
 x_l             = np.array(onp.random.normal(size=(N_slabs, 2, slab_params.N_grid, slab_params.N_grid//2 + 1))) 
 dens_slabs_true = transform.x2delta(x_l, theta_fid)

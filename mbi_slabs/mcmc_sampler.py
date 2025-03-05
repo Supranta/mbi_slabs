@@ -17,6 +17,8 @@ class MCMCSampler:
         self.sigma_noise = sigma_noise
         self.nbar = nbar
         self.burn_in = True
+        self.theta_fid = np.array([0.27, 0.82])
+        self.cosmo_fid = get_cosmo(self.theta_fid)
 
     def setup_model(self, N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key):
         def get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs):
@@ -37,7 +39,7 @@ class MCMCSampler:
 
         def density_slab_model(nz_src_list, nz_lens_list, prior):            
             if(self.burn_in):
-                theta_cosmo = numpyro.deterministic('theta_cosmo', np.array([0.27, 0.82]))
+                theta_cosmo = numpyro.deterministic('theta_cosmo', self.theta_fid)
                 Dz_src  = numpyro.deterministic('Dz_src', np.zeros(N_SRC_BINS))
                 m       = numpyro.deterministic('m', np.zeros(N_SRC_BINS))
                 A_ia    = numpyro.deterministic('A_ia', 0.5)
@@ -60,10 +62,14 @@ class MCMCSampler:
                                rng_key=key)
             dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
 
-            cosmo = get_cosmo(theta_cosmo)
+            if(self.fixed_slab_distance):
+                cosmo = self.cosmo_fid
+            else:
+                cosmo = get_cosmo(theta_cosmo)
+
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs)
-            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, cosmo, dens_slabs)
+            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, self.cosmo_fid, dens_slabs)
             gamma = jax.vmap(self.Fourier.kappa2gamma)(kappa + kappa_ia)
 
             # Sample observations
@@ -81,6 +87,9 @@ class MCMCSampler:
 
     def set_burn_in(self, burn_in):
         self.burn_in = burn_in
+
+    def set_cosmo_distances(self, cosmo_distance=False):
+        self.fixed_slab_distance = cosmo_distance
 
     def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, prior, rng_key, 
                     init_values=None, last_state=None):

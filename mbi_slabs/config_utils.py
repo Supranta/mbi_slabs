@@ -17,6 +17,7 @@ class SlabConfig:
     L: float
     transform: str
     pk_emu_file: str
+    cosmo_distance: bool
 
     def __post_init__(self):
         valid_transforms = ["gaussian", "lognormal"]

@@ -5,7 +5,7 @@ def get_cosmo(theta_cosmo):
     Omega_m, sigma8 = theta_cosmo
     Omega_b, h, ns, w0, wa = 0.05, 0.7, 0.97, -1., 0.
     Omega_c = Omega_m - Omega_b
-    return jc.Cosmology(Omega_c, Omega_b, h, ns, sigma8, 0., w0, wa)
+    return jc.Cosmology(Omega_c, Omega_b, h, ns, sigma8, 0., w0, wa, gamma=0.55)
 
 class RedshiftDist:
     def __init__(self, z_boundaries, nz_data):

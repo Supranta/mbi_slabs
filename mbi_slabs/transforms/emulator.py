@@ -67,7 +67,7 @@ class JAXGP:
         L = np.linalg.cholesky(K_y + 1e-6 * np.eye(len(X)))
         self.alpha = np.linalg.solve(np.transpose(L), np.linalg.solve(L, y))
         print(f"Optimized hyperparameters: length_scale={opt_params[:-1]}, "
-              f"signal_var={opt_params[-1]:.4f}") #, noise_var={opt_params[-1]:.8f}")
+              f"signal_var={opt_params[-1]:.4f}") 
 
 def normalize_pk(pk_scale):
     k0_scaling = pk_scale[:,0]
@@ -83,18 +83,18 @@ def fit_pca(pk_scale, N_PCA=6):
     pca_components = pca.components_
     return np.array(pca_coeff), k0_scaling, np.array(pca_mean), np.array(pca_components)
 
-def get_kernel_vmap(params, theta_pred, theta_test):
-    return jax.vmap(lambda params, theta_pred: compute_kernel_matrix(theta_pred, theta_test, params),
-                in_axes=(0, None, None))
-
 class PkEmulator:
-    def __init__(self, pk_emu_file):
+    def __init__(self, pk_emu_file, lognormal=False):
         with h5.File(pk_emu_file, 'r') as f:
             self.k   = f['k'][:]
             fid = f['fiducial']
             self.pk_fid = fid['Pk'][:][0]
+            self.theta_fid = fid['theta'][:]
             theta    = f['emulator']['theta'][:]
             pk_scale = f['emulator']['Pk_scale'][:]
+            if(lognormal):
+                self.y_mean_fid = fid['mu_y'][:]
+                y_scale = f['emulator']['y_scale'][:]
         self.theta = np.array(theta)
         self.N_slabs = pk_scale.shape[1]
         self.ndim = 2
@@ -116,12 +116,18 @@ class PkEmulator:
                 pca_coeff_gp = self.train_gp(np.array(pca_coeff[:,j]))
                 pca_coeff_gps.append(pca_coeff_gp)
             gp_i = [k0_scaling_gp, pca_coeff_gps]
+            if(lognormal):
+                y_gp = self.train_gp(y_scale[:,i])
+                gp_i.append(y_gp)
             self.gp_list.append(gp_i)
         self.pca_mean       = np.array(pca_means)
         self.pca_components = np.array(pca_components)
         self.extract_k0_gp_params()
         self.extract_pca_gp_params()
-    
+        if(lognormal):
+            self.extract_y_gp_params()
+            y_mean = self.get_y_mean(self.theta_fid[np.newaxis])
+
     def train_gp(self, y):
         gp_emu = JAXGP(self.ndim)
         gp_emu.fit(self.theta, y)
@@ -140,6 +146,17 @@ class PkEmulator:
             alpha_list.append(alpha)
         self.k0_params = np.array(params_list)
         self.k0_alpha  = np.array(alpha_list)
+
+    def extract_y_gp_params(self):
+        params_list  = []
+        alpha_list   = []
+        for i in range(self.N_slabs):
+            y_gp = self.gp_list[i][2]
+            params, alpha = self._extract_gp_params(y_gp)
+            params_list.append(params)
+            alpha_list.append(alpha)
+        self.y_params = np.array(params_list)
+        self.y_alpha  = np.array(alpha_list)
 
     def extract_pca_gp_params(self):
         params_list  = []
@@ -161,6 +178,11 @@ class PkEmulator:
     def get_k0(self, theta_pred):
         Ks = self.get_gp_kernel(self.k0_params, theta_pred)[:,0]
         return np.sum(Ks * self.k0_alpha, axis=1) 
+
+    def get_y_mean(self, theta_pred):
+        Ks = self.get_gp_kernel(self.y_params, theta_pred)[:,0]
+        y_scale = np.sum(Ks * self.y_alpha, axis=1) 
+        return y_scale * self.y_mean_fid
 
     def get_pca_coeff(self, theta_pred):
         Ks = self.get_gp_kernel(self.pca_params, theta_pred)[:,0]
