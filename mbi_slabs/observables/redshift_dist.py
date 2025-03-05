@@ -1,8 +1,9 @@
 import jax.numpy as np
 import jax_cosmo as jc
 
-def get_cosmo(Omega_m):
-    Omega_b, h, ns, sigma8, w0, wa = 0.05, 0.7, 0.97, 0.80, -1., 0.
+def get_cosmo(theta_cosmo):
+    Omega_m, sigma8 = theta_cosmo
+    Omega_b, h, ns, w0, wa = 0.05, 0.7, 0.97, -1., 0.
     Omega_c = Omega_m - Omega_b
     return jc.Cosmology(Omega_c, Omega_b, h, ns, sigma8, 0., w0, wa)
 
@@ -23,8 +24,8 @@ class RedshiftDist:
         weights = np.sum((self.nz_bin * M), axis=1)
         return np.expand_dims(np.expand_dims(weights, -1), -1)
     
-    def get_slab_weights_kappa(self, Omega_m, Delta_z):
-        M = self.get_kappa_mixing_matrix(Omega_m, Delta_z)
+    def get_slab_weights_kappa(self, cosmo, Delta_z):
+        M = self.get_kappa_mixing_matrix(cosmo, Delta_z)
         weights = np.sum((self.nz_bin * M), axis=1)
         return np.expand_dims(np.expand_dims(weights, -1), -1)
     
@@ -60,10 +61,8 @@ class HistogramDist(RedshiftDist):
         term3 = -0.25 * linear_z_slope * (chi_lim_hi**4 - chi_lim_lo**4) * np.expand_dims(1. / chi_grid, 0)
         return np.clip(term1 + term2 + term3, 0.)
 
-    def get_kappa_mixing_matrix(self, Omega_m, Delta_z=0.):
-        cosmo = get_cosmo(Omega_m)
-    
-        prefactor   = 1.5 * Omega_m / jc.constants.rh / jc.constants.rh
+    def get_kappa_mixing_matrix(self, cosmo, Delta_z=0.):
+        prefactor   = 1.5 * cosmo.Omega_m / jc.constants.rh / jc.constants.rh
     
         chi_max = jc.background.radial_comoving_distance(cosmo, 1. / (1. + self.z_boundaries_max))
         chi_min = jc.background.radial_comoving_distance(cosmo, 1. / (1. + self.z_boundaries_min))
@@ -93,9 +92,9 @@ class ObservableCalculator:
         C1 = -A1 * self.C_cr * OmegaM * ((1. + self.z_slabs)/(1. + self.z0))**eta
         return C1
     
-    def get_kappa(self, nz, Omega_m, Delta_z, dens_slabs):
+    def get_kappa(self, nz, cosmo, Delta_z, dens_slabs):
         """Calculate kappa (lensing convergence) for given density slabs"""
-        weights = nz.get_slab_weights_kappa(Omega_m, Delta_z)
+        weights = nz.get_slab_weights_kappa(cosmo, Delta_z)
         return np.sum((weights * dens_slabs), axis=0)
     
     def get_proj_density(self, nz, Delta_z, dens_slabs):
@@ -103,8 +102,9 @@ class ObservableCalculator:
         weights = nz.get_slab_weights_proj_density(Delta_z)
         return np.sum((weights * dens_slabs), axis=0)
     
-    def get_kappa_ia(self, nz, Omega_m, Delta_z, A1, eta, dens_slabs):
+    def get_kappa_ia(self, nz, cosmo, Delta_z, A1, eta, dens_slabs):
         """Calculate intrinsic alignment contribution to kappa"""
-        C_ia = self.A2C(A1, eta, Omega_m)
+        Dz      = jc.background.growth_factor(cosmo, 1. / (1. + self.z_slabs))
+        C_ia    = self.A2C(A1, eta, cosmo.Omega_m) / Dz
         weights = C_ia[:,np.newaxis,np.newaxis] * nz.get_slab_weights_proj_density(Delta_z)
         return np.sum((weights * dens_slabs), axis=0)

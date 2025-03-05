@@ -5,6 +5,7 @@ import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
 import h5py as h5
 from tqdm import trange
+from .observables import get_cosmo
 
 class MCMCSampler:
     def __init__(self, transform, Fourier, obs_calc, N_slabs, N_grid, sigma_noise, nbar):
@@ -18,13 +19,13 @@ class MCMCSampler:
         self.burn_in = True
 
     def setup_model(self, N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key):
-        def get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], 0.3, Dz_src[i], dens_slabs) 
+        def get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs):
+            kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], cosmo, Dz_src[i], dens_slabs) 
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
-        def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa_ia(nz_src_list[i], 0.3, Dz_src[i], A_ia, eta_ia, dens_slabs) 
+        def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, cosmo, dens_slabs):
+            kappa_list = [self.obs_calc.get_kappa_ia(nz_src_list[i], cosmo, Dz_src[i], A_ia, eta_ia, dens_slabs) 
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
@@ -59,9 +60,10 @@ class MCMCSampler:
                                rng_key=key)
             dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
 
+            cosmo = get_cosmo(theta_cosmo)
             # Calculate observables
-            kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)
-            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, dens_slabs)
+            kappa = get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs)
+            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, cosmo, dens_slabs)
             gamma = jax.vmap(self.Fourier.kappa2gamma)(kappa + kappa_ia)
 
             # Sample observations

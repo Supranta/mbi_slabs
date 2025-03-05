@@ -2,12 +2,6 @@ import jax_cosmo as jc
 import jax.numpy as np
 import numpy as onp
 
-def get_cosmo(Omega_m):
-    Omega_b, h, ns, sigma8, w0, wa = 0.05, 1., 0.95, 0.80, -1., 0.
-    Omega_c = Omega_m - Omega_b
-    return jc.Cosmology(Omega_c, Omega_b, h, ns, sigma8, 0., w0, wa)
-
-
 def get_slabs_z_boundaries(cosmo_fid, z_grid, slab_definition):
     """
     Get the redshift boundaries of the density slabs from comoving distance definitions

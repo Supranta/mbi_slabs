@@ -10,7 +10,8 @@ configfile = sys.argv[1]
 
 EnvironmentSetup.setup_jax_env()
 
-cosmo = get_cosmo(0.3)
+theta_fid = np.array([0.27, 0.82])[np.newaxis]
+cosmo     = get_cosmo(theta_fid[0])
 
 config = ConfigLoader(configfile)
 

@@ -9,7 +9,9 @@ from mbi_slabs.transforms import MapTools
 EnvironmentSetup.setup_jax_env()
 
 configfile = sys.argv[1]
-cosmo = get_cosmo(0.3)
+
+theta_fid = np.array([0.27, 0.82])[np.newaxis]
+cosmo     = get_cosmo(theta_fid[0])
 
 config = ConfigLoader(configfile)
 
@@ -39,7 +41,6 @@ elif(slab_params.transform == "lognormal"):
     transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.Pk_slabs)
 
 x_l             = np.array(onp.random.normal(size=(N_slabs, 2, slab_params.N_grid, slab_params.N_grid//2 + 1))) 
-theta_fid       = np.array([0.27, 0.82])[np.newaxis]
 dens_slabs_true = transform.x2delta(x_l, theta_fid)
     
 obs_calc = ObservableCalculator(z_slabs)
@@ -47,8 +48,8 @@ obs_calc = ObservableCalculator(z_slabs)
 N_LENS_BINS = len(catalogs.nz_lens_list)
 N_SRC_BINS  = len(catalogs.nz_src_list) 
 
-kappa_list        = [obs_calc.get_kappa(catalogs.nz_src_list[i], cosmo.Omega_m, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
-kappa_ia_list     = [obs_calc.get_kappa_ia(catalogs.nz_src_list[i], cosmo.Omega_m, 0., data_config.A_ia, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
+kappa_list        = [obs_calc.get_kappa(catalogs.nz_src_list[i], cosmo, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
+kappa_ia_list     = [obs_calc.get_kappa_ia(catalogs.nz_src_list[i], cosmo, 0., data_config.A_ia, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
 proj_density_list = [obs_calc.get_proj_density(catalogs.nz_lens_list[i], 0., dens_slabs_true) for i in range(N_LENS_BINS)]
 
 l = (slab_params.L / slab_params.N_grid)

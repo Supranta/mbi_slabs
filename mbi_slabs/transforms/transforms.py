@@ -1,6 +1,5 @@
 import jax.numpy as np
 import jax_cosmo as jc
-from ..utils import get_cosmo
 from jax import vmap, jit
 from .map_tools import MapTools
 from .emulator import PkEmulator
