@@ -36,7 +36,7 @@ class MCMCSampler:
 
         def density_slab_model(nz_src_list, nz_lens_list, prior):            
             if(self.burn_in):
-                A_cosmo = numpyro.deterministic('A_cosmo', 1.)
+                theta_cosmo = numpyro.deterministic('theta_cosmo', np.array([0.27, 0.82]))
                 Dz_src  = numpyro.deterministic('Dz_src', np.zeros(N_SRC_BINS))
                 m       = numpyro.deterministic('m', np.zeros(N_SRC_BINS))
                 A_ia    = numpyro.deterministic('A_ia', 0.5)
@@ -45,7 +45,7 @@ class MCMCSampler:
                 bg      = numpyro.deterministic('bg', np.ones(N_LENS_BINS))
             else:
                 # Sample parameters
-                A_cosmo = numpyro_sample(prior, 'A_cosmo', key)
+                theta_cosmo = numpyro_sample(prior, 'theta_cosmo', key)
                 Dz_src  = numpyro_sample(prior, 'Dz_src', key)
                 m       = numpyro_sample(prior, 'm', key)
                 A_ia    = numpyro_sample(prior, 'A_ia', key)
@@ -57,7 +57,7 @@ class MCMCSampler:
                                dist.Normal(np.zeros((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1)), 
                                             np.ones((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))), 
                                rng_key=key)
-            dens_slabs = self.transform.x2delta(x_l, A_cosmo)
+            dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
 
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, dens_slabs)
@@ -116,7 +116,7 @@ class MCMCSampler:
     def save_samples(self, samples, io_config, n_samples, n_start=0):
         for i in trange(n_samples):
             with h5.File(f'{io_config.output_dir}/mcmc_{i + n_start}.h5', 'w') as f:
-                f['A_cosmo'] = samples['A_cosmo'][i]
+                f['theta_cosmo'] = samples['theta_cosmo'][i]
                 f['bg']      = samples['bg'][i]
                 f['m']       = samples['m'][i]
                 f['Dz_src']  = samples['Dz_src'][i]
@@ -124,6 +124,6 @@ class MCMCSampler:
                 f['A_ia']    = samples['A_ia'][i]
                 f['eta_ia']  = samples['eta_ia'][i]
                 if(io_config.save_maps):
-                    dens_slabs_sample = self.transform.x2delta(samples['x_l'][i], samples['A_cosmo'][i])
+                    dens_slabs_sample = self.transform.x2delta(samples['x_l'][i], samples['theta_cosmo'][i][np.newaxis])
                     f['slab_dens'] = dens_slabs_sample
                 

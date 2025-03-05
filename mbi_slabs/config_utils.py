@@ -16,7 +16,7 @@ class SlabConfig:
     N_grid: int
     L: float
     transform: str
-    slab_pk_file: str
+    pk_emu_file: str
 
     def __post_init__(self):
         valid_transforms = ["gaussian", "lognormal"]
@@ -101,19 +101,8 @@ class ConfigLoader:
         return PriorConfig(self.config['prior'])
 
     def get_slab_config(self) -> SlabConfig:
-        self.slab_pk_file = self.config['slabs']['slab_pk_file']
-        self.set_slab_pk(self.config['slabs']['transform']=='lognormal') 
+        self.pk_emu_file = self.config['slabs']['pk_emu_file']
         return SlabConfig(**self.config['slabs'])
-
-    def set_slab_pk(self, lognormal=False):
-        with h5.File(self.slab_pk_file, 'r') as f:
-            k  = f['k'][:]
-            Pk = f['Pk'][:]
-            if(lognormal):
-                mu = f['mu'][:]
-            else:
-                mu = None
-        self.Pk_slabs = {'k': k, 'Pk': Pk, 'mu': mu}
 
     def get_sampling_config(self) -> SamplingConfig:
         mcmc_config = self.config['sampling']['mcmc']

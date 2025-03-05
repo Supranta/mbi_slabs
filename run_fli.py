@@ -34,7 +34,7 @@ catalogs = catalog_init.create_catalogs(observables)
 N_slabs = z_slabs.shape[0]
 
 if(slab_params.transform=='gaussian'):
-    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.Pk_slabs)
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
 elif(slab_params.transform=='lognormal'):
     transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.Pk_slabs)
 

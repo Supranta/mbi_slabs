@@ -1,0 +1,175 @@
+import jax
+import jax.numpy as np
+from jax import grad, jit
+import jaxopt
+import h5py as h5
+from tqdm import trange
+from sklearn.decomposition import PCA
+
+jax.config.update("jax_enable_x64", True)
+
+@jit
+def rbf_kernel(X1, X2, length_scale, signal_var):
+    X1 = X1 / length_scale
+    X2 = X2 / length_scale
+    
+    X1_sq = np.sum(X1**2, axis=1)[:, None]
+    X2_sq = np.sum(X2**2, axis=1)[None, :]
+    X1X2 = np.matmul(X1, X2.T)
+    sq_dist = X1_sq + X2_sq - 2 * X1X2
+        
+    return signal_var * np.exp(-0.5 * sq_dist)
+    
+@jit
+def compute_kernel_matrix(X1, X2, params):
+    length_scale, signal_var = params[:-1], params[-1]
+    return rbf_kernel(X1, X2, length_scale, signal_var)
+
+class JAXGP:
+    def __init__(self, n_dim):
+        self.n_dim = n_dim
+        
+    def negative_log_likelihood(self, params, X, y):
+        length_scale = params[:-1]
+        signal_var = params[-1]
+        
+        K_y = compute_kernel_matrix(X, X, params)
+        
+        L = np.linalg.cholesky(K_y + 1e-6 * np.eye(len(X)))
+
+        alpha = np.linalg.solve(np.transpose(L), np.linalg.solve(L, y))
+       
+        nll = 0.5 * np.dot(y, alpha) + np.sum(np.log(np.diag(L))) + 0.5 * len(X) * np.log(2 * np.pi)
+        
+        return nll
+    
+    def nll_wrapper(self, unconstrained_params, X, y):
+        params = np.exp(unconstrained_params)
+        return self.negative_log_likelihood(params, X, y)
+    
+    def fit(self, X, y):
+        X = np.array(X)
+        y = np.array(y).reshape(-1)
+
+        initial_params = np.array([0. for _ in range(self.n_dim)] + [6.])  
+        
+        def objective(params):
+            return self.nll_wrapper(params, X, y)
+       
+        optimizer = jaxopt.ScipyMinimize(fun=objective) 
+        result    = optimizer.run(initial_params) 
+        opt_params = result.params 
+
+        self.params = np.exp(opt_params)
+        self.X_train = X
+        
+        K_y = compute_kernel_matrix(X, X, self.params)
+        L = np.linalg.cholesky(K_y + 1e-6 * np.eye(len(X)))
+        self.alpha = np.linalg.solve(np.transpose(L), np.linalg.solve(L, y))
+        print(f"Optimized hyperparameters: length_scale={opt_params[:-1]}, "
+              f"signal_var={opt_params[-1]:.4f}") #, noise_var={opt_params[-1]:.8f}")
+
+def normalize_pk(pk_scale):
+    k0_scaling = pk_scale[:,0]
+    pk_fit = pk_scale / k0_scaling[:,np.newaxis]
+    return pk_fit, np.log(k0_scaling)
+
+def fit_pca(pk_scale, N_PCA=6):
+    pk_fit, k0_scaling = normalize_pk(pk_scale)
+    pca = PCA(N_PCA)
+    pca.fit(pk_fit)
+    pca_coeff = pca.transform(pk_fit)
+    pca_mean       = pca.mean_
+    pca_components = pca.components_
+    return np.array(pca_coeff), k0_scaling, np.array(pca_mean), np.array(pca_components)
+
+def get_kernel_vmap(params, theta_pred, theta_test):
+    return jax.vmap(lambda params, theta_pred: compute_kernel_matrix(theta_pred, theta_test, params),
+                in_axes=(0, None, None))
+
+class PkEmulator:
+    def __init__(self, pk_emu_file):
+        with h5.File(pk_emu_file, 'r') as f:
+            self.k   = f['k'][:]
+            fid = f['fiducial']
+            self.pk_fid = fid['Pk'][:][0]
+            theta    = f['emulator']['theta'][:]
+            pk_scale = f['emulator']['Pk_scale'][:]
+        self.theta = np.array(theta)
+        self.N_slabs = pk_scale.shape[1]
+        self.ndim = 2
+        self.N_PCA = 6
+        self.N_k   = pk_scale.shape[-1]
+        self.gp_list = []
+        pca_means       = []
+        pca_components = []
+        for i in trange(self.N_slabs):
+            pca_coeff, k0_scaling, pca_mean, pca_component = fit_pca(pk_scale[:,i], self.N_PCA)
+            pca_means.append(pca_mean)
+            pca_components.append(pca_component)
+            k0_scaling_gp = self.train_gp(k0_scaling)
+            pca_coeff_gps = []
+            pca_coeffs    = [] 
+            for j in range(self.N_PCA):
+                pca_coeff_data = [self.theta, np.array(pca_coeff[:,j])]
+                pca_coeffs.append(np.array(pca_coeff[:,j]))
+                pca_coeff_gp = self.train_gp(np.array(pca_coeff[:,j]))
+                pca_coeff_gps.append(pca_coeff_gp)
+            gp_i = [k0_scaling_gp, pca_coeff_gps]
+            self.gp_list.append(gp_i)
+        self.pca_mean       = np.array(pca_means)
+        self.pca_components = np.array(pca_components)
+        self.extract_k0_gp_params()
+        self.extract_pca_gp_params()
+    
+    def train_gp(self, y):
+        gp_emu = JAXGP(self.ndim)
+        gp_emu.fit(self.theta, y)
+        return gp_emu
+    
+    def _extract_gp_params(self, gp):
+        return gp.params, gp.alpha 
+
+    def extract_k0_gp_params(self):
+        params_list  = []
+        alpha_list   = []
+        for i in range(self.N_slabs):
+            k0_scaling_gp = self.gp_list[i][0]
+            params, alpha = self._extract_gp_params(k0_scaling_gp)
+            params_list.append(params)
+            alpha_list.append(alpha)
+        self.k0_params = np.array(params_list)
+        self.k0_alpha  = np.array(alpha_list)
+
+    def extract_pca_gp_params(self):
+        params_list  = []
+        alpha_list   = []
+        for i in range(self.N_slabs):
+            pca_gp = self.gp_list[i][1]
+            for j in range(self.N_PCA):
+                params, alpha = self._extract_gp_params(pca_gp[j])
+                params_list.append(params)
+                alpha_list.append(alpha)
+        self.pca_params = np.array(params_list)
+        self.pca_alpha  = np.array(alpha_list)
+
+    def get_gp_kernel(self, params_batch, theta_pred):
+        batch_kernel_fn = jax.vmap(lambda p, tp, t: compute_kernel_matrix(tp, t, p),
+                                in_axes=(0, None, None))
+        return batch_kernel_fn(params_batch, theta_pred, self.theta)
+
+    def get_k0(self, theta_pred):
+        Ks = self.get_gp_kernel(self.k0_params, theta_pred)[:,0]
+        return np.sum(Ks * self.k0_alpha, axis=1) 
+
+    def get_pca_coeff(self, theta_pred):
+        Ks = self.get_gp_kernel(self.pca_params, theta_pred)[:,0]
+        pca_coeff = np.sum(Ks * self.pca_alpha, axis=1)
+        return pca_coeff.reshape((self.N_slabs, self.N_PCA))
+
+    def predict_pk(self, theta_pred):
+        k0 = self.get_k0(theta_pred)[np.newaxis,:,np.newaxis]
+        pca_coeffs = self.get_pca_coeff(theta_pred)[:,:,np.newaxis]
+        pk_pred = self.pca_mean + np.sum(pca_coeffs * self.pca_components, axis=1)
+        return np.exp(k0) * pk_pred * self.pk_fid
+    

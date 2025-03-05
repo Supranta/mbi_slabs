@@ -3,20 +3,21 @@ import jax_cosmo as jc
 from ..utils import get_cosmo
 from jax import vmap, jit
 from .map_tools import MapTools
+from .emulator import PkEmulator
 
 def powerlaw(k, A, alpha):
     return A * k**alpha
 
 class Transform:
-    def __init__(self, N_slabs, N_grid, L, Pk_slabs):
+    def __init__(self, N_slabs, N_grid, L, pk_emu_file):
         self.map_tools = MapTools(N_grid, L)
         self.N_grid    = N_grid
         self.N_slabs   = N_slabs
         self.L         = L
         
-        self.log_k_slabs  = np.log(Pk_slabs['k'])        
-        self.log_Pk_slabs = np.log(Pk_slabs['Pk'])        
-        self.mu           = Pk_slabs['mu']
+        self.pk_emu = PkEmulator(pk_emu_file)
+
+        self.log_k_slabs  = np.log(self.pk_emu.k)        
 
         self.k_mask = np.ones_like(self.map_tools.ell, dtype=bool)
         self.k_mask = self.k_mask.at[0, 0].set(False)
@@ -25,13 +26,12 @@ class Transform:
         
         self.fourier2map_slabs = jit(vmap(self.map_tools.fourier2map))
 
-        self.set_Pk_arr()
-
-    def set_Pk_arr(self):
+    def get_Pk_arr(self, theta_cosmo):
         Pk_arr = np.zeros((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))
 
+        log_pk = np.log(self.pk_emu.predict_pk(theta_cosmo)[0])
         for i in range(self.N_slabs):
-            pk_eval = np.exp(jc.scipy.interpolate.interp(self.log_k_eval, self.log_k_slabs, self.log_Pk_slabs[i]))
+            pk_eval = np.exp(jc.scipy.interpolate.interp(self.log_k_eval, self.log_k_slabs, log_pk[i]))
             Pk_arr = Pk_arr.at[i,:,self.k_mask].add(pk_eval[:,np.newaxis])
         
         Pk_arr = Pk_arr.at[:,:,0,0].set(1e-20)
@@ -46,15 +46,15 @@ class Transform:
         Pk_arr.at[:,1,self.N_grid//2,0].set(1e-20) 
         Pk_arr.at[:,1,self.N_grid//2,-1].set(1e-20) 
 
-        self.Pk_arr = Pk_arr * self.map_tools.Omega_s
+        return Pk_arr * self.map_tools.Omega_s
 
 class GaussianTransform(Transform):
     def __init__(self, N_slabs, N_grid, L, Pk_slabs):
         super().__init__(N_slabs, N_grid, L, Pk_slabs)
-
         
-    def x2delta(self, x_l, A_cosmo):
-        delta_l = x_l * np.sqrt(A_cosmo * self.Pk_arr)
+    def x2delta(self, x_l, theta_cosmo):
+        Pk_arr    = self.get_Pk_arr(theta_cosmo)
+        delta_l   = x_l * np.sqrt(Pk_arr)
         delta_map = self.fourier2map_slabs(delta_l)
         return delta_map
 
