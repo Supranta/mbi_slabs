@@ -21,13 +21,13 @@ class MCMCSampler:
         self.cosmo_fid = get_cosmo(self.theta_fid)
 
     def setup_model(self, N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key):
-        def get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], cosmo, Dz_src[i], dens_slabs) 
+        def get_kappa_from_slabs(nz_src_list, Dz_src, Omega_m, dens_slabs):
+            kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], Omega_m, Dz_src[i], dens_slabs) 
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
-        def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, cosmo, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa_ia(nz_src_list[i], cosmo, Dz_src[i], A_ia, eta_ia, dens_slabs) 
+        def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, Omega_m, dens_slabs):
+            kappa_list = [self.obs_calc.get_kappa_ia(nz_src_list[i], Omega_m, Dz_src[i], A_ia, eta_ia, dens_slabs) 
                          for i in range(N_SRC_BINS)]
             return np.stack(kappa_list)
 
@@ -62,14 +62,9 @@ class MCMCSampler:
                                rng_key=key)
             dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
 
-            if(self.fixed_slab_distance):
-                cosmo = self.cosmo_fid
-            else:
-                cosmo = get_cosmo(theta_cosmo)
-
             # Calculate observables
-            kappa = get_kappa_from_slabs(nz_src_list, Dz_src, cosmo, dens_slabs)
-            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, self.cosmo_fid, dens_slabs)
+            kappa = get_kappa_from_slabs(nz_src_list, Dz_src, theta_cosmo[0], dens_slabs)
+            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, theta_cosmo[0], dens_slabs)
             gamma = jax.vmap(self.Fourier.kappa2gamma)(kappa + kappa_ia)
 
             # Sample observations
@@ -87,9 +82,6 @@ class MCMCSampler:
 
     def set_burn_in(self, burn_in):
         self.burn_in = burn_in
-
-    def set_cosmo_distances(self, cosmo_distance=False):
-        self.fixed_slab_distance = cosmo_distance
 
     def run_mcmc(self, model, sampling_params, nz_src_list, nz_lens_list, prior, rng_key, 
                     init_values=None, last_state=None):

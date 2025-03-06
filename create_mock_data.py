@@ -48,8 +48,8 @@ obs_calc = ObservableCalculator(z_slabs)
 N_LENS_BINS = len(catalogs.nz_lens_list)
 N_SRC_BINS  = len(catalogs.nz_src_list) 
 
-kappa_list        = [obs_calc.get_kappa(catalogs.nz_src_list[i], cosmo, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
-kappa_ia_list     = [obs_calc.get_kappa_ia(catalogs.nz_src_list[i], cosmo, 0., data_config.A_ia, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
+kappa_list        = [obs_calc.get_kappa(catalogs.nz_src_list[i], cosmo.Omega_m, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
+kappa_ia_list     = [obs_calc.get_kappa_ia(catalogs.nz_src_list[i], cosmo.Omega_m, 0., data_config.A_ia, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
 proj_density_list = [obs_calc.get_proj_density(catalogs.nz_lens_list[i], 0., dens_slabs_true) for i in range(N_LENS_BINS)]
 
 l = (slab_params.L / slab_params.N_grid)

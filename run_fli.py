@@ -59,7 +59,6 @@ rng_key, rng_key_ = jax.random.split(key)
 sampler = MCMCSampler(transform, F, obs_calc, N_slabs, slab_params.N_grid, 
                       data_config.sigma_e, nbar)
 # run burnin MCMC
-sampler.set_cosmo_distances(slab_params.cosmo_distance)
 print("Running a burnin chain...")
 model = sampler.setup_model(N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key)
 
