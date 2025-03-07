@@ -24,13 +24,13 @@ class PolyDist:
         self.Om_fid    = Om_fid
         self.Om_minmax = Om_minmax
         self.chi_fid = self.get_distances(self.Om_fid)
+        self.poly_deg = np.arange(self.deg + 1)[::-1]
         if polyfit is not None:
             self.polyfit = polyfit
         else:
             self.chi_arr = self.create_chi_arr(self.Om_minmax)
             self.x = self.Om_arr / self.Om_fid - 1.
             self.y = self.chi_arr / self.chi_fid - 1.
-            self.poly_deg = np.arange(self.deg + 1)[::-1]
             self.fit_polynomial()
             self.test_polyfit()
         
