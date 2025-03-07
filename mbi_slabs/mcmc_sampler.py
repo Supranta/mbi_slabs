@@ -61,7 +61,7 @@ class MCMCSampler:
                                             np.ones((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))), 
                                rng_key=key)
             dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
-
+            
             # Calculate observables
             kappa = get_kappa_from_slabs(nz_src_list, Dz_src, theta_cosmo[0], dens_slabs)
             kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, theta_cosmo[0], dens_slabs)

@@ -29,7 +29,7 @@ map_tools = MapTools(slab_params.N_grid, slab_params.L)
 F         = FourierTransforms(slab_params.N_grid)
 
 # Initialize catalogs
-catalog_init = CatalogInitializer()
+catalog_init = CatalogInitializer(polydist_file=slab_params.polydist_file)
 z_slabs      = catalog_init.setup_boundaries(cosmo, slab_params)
 catalogs     = catalog_init.create_catalogs(observables)
 
