@@ -113,6 +113,11 @@ class ObservableCalculator:
         """Calculate kappa (lensing convergence) for given density slabs"""
         weights = nz.get_slab_weights_kappa(cosmo, Delta_z)
         return np.sum((weights * dens_slabs), axis=0)
+
+    def get_gamma(self, nz, cosmo, Delta_z, s_slabs):
+        """Calculate gamma (lensing shear) for given density slabs"""
+        weights = nz.get_slab_weights_kappa(cosmo, Delta_z)[:,np.newaxis]
+        return np.sum((weights * s_slabs), axis=0)
     
     def get_proj_density(self, nz, Delta_z, dens_slabs):
         """Calculate projected density for given density slabs"""
@@ -121,6 +126,14 @@ class ObservableCalculator:
     
     def get_kappa_ia(self, nz, Omega_m, Delta_z, A1, eta, dens_slabs):
         """Calculate intrinsic alignment contribution to kappa"""
-        C_ia                = self.A2C(Omega_m, A1, eta)
-        weights             = C_ia[:,np.newaxis,np.newaxis] * nz.get_slab_weights_proj_density(Delta_z)
+        C_ia    = self.A2C(Omega_m, A1, eta)
+        weights = C_ia[:,np.newaxis,np.newaxis] * nz.get_slab_weights_proj_density(Delta_z)
         return np.sum((weights * dens_slabs), axis=0)
+     
+    def get_gamma_ia(self, nz, Omega_m, Delta_z, A1, eta, bta, dens_slabs, s_slabs):
+        """Calculate intrinsic alignment contribution to gamma including the bta term"""
+        C_ia    = self.A2C(Omega_m, A1, eta)
+        weights = (C_ia[:,np.newaxis,np.newaxis] * nz.get_slab_weights_proj_density(Delta_z))[:,np.newaxis]
+        gamma_1 = np.sum((weights * s_slabs), axis=0)
+        gamma_2 = bta * np.sum((weights * dens_slabs[:,np.newaxis] * s_slabs), axis=0)
+        return gamma_1 + gamma_2

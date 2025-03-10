@@ -21,15 +21,15 @@ class MCMCSampler:
         self.cosmo_fid = get_cosmo(self.theta_fid)
 
     def setup_model(self, N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key):
-        def get_kappa_from_slabs(nz_src_list, Dz_src, Omega_m, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa(nz_src_list[i], Omega_m, Dz_src[i], dens_slabs) 
+        def get_gamma_from_slabs(nz_src_list, Dz_src, Omega_m, s_slabs):
+            gamma_list = [self.obs_calc.get_gamma(nz_src_list[i], Omega_m, Dz_src[i], s_slabs) 
                          for i in range(N_SRC_BINS)]
-            return np.stack(kappa_list)
+            return np.stack(gamma_list)
 
-        def get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, Omega_m, dens_slabs):
-            kappa_list = [self.obs_calc.get_kappa_ia(nz_src_list[i], Omega_m, Dz_src[i], A_ia, eta_ia, dens_slabs) 
+        def get_gamma_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, bta, Omega_m, dens_slabs, s_slabs):
+            gamma_list = [self.obs_calc.get_gamma_ia(nz_src_list[i], Omega_m, Dz_src[i], A_ia, eta_ia, bta, dens_slabs, s_slabs) 
                          for i in range(N_SRC_BINS)]
-            return np.stack(kappa_list)
+            return np.stack(gamma_list)
 
         def numpyro_sample(prior, x, key):
             if isinstance(prior[x], dict):
@@ -44,6 +44,7 @@ class MCMCSampler:
                 m       = numpyro.deterministic('m', np.zeros(N_SRC_BINS))
                 A_ia    = numpyro.deterministic('A_ia', 0.5)
                 eta_ia  = numpyro.deterministic('eta_ia', 0.)
+                bta     = numpyro.deterministic('bta', 0.)
                 Dz_lens = numpyro.deterministic('Dz_lens', np.zeros(N_LENS_BINS))
                 bg      = numpyro.deterministic('bg', np.ones(N_LENS_BINS))
             else:
@@ -53,6 +54,7 @@ class MCMCSampler:
                 m       = numpyro_sample(prior, 'm', key)
                 A_ia    = numpyro_sample(prior, 'A_ia', key)
                 eta_ia  = numpyro_sample(prior, 'eta_ia', key)
+                bta     = numpyro_sample(prior, 'bta', key)
                 Dz_lens = numpyro_sample(prior, 'Dz_lens', key)
                 bg      = numpyro_sample(prior, 'bg', key)
 
@@ -61,11 +63,10 @@ class MCMCSampler:
                                             np.ones((self.N_slabs, 2, self.N_grid, self.N_grid//2 + 1))), 
                                rng_key=key)
             dens_slabs = self.transform.x2delta(x_l, theta_cosmo[np.newaxis])
-            
-            # Calculate observables
-            kappa = get_kappa_from_slabs(nz_src_list, Dz_src, theta_cosmo[0], dens_slabs)
-            kappa_ia = get_kappa_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, theta_cosmo[0], dens_slabs)
-            gamma = jax.vmap(self.Fourier.kappa2gamma)(kappa + kappa_ia)
+            s_slabs    = jax.vmap(self.Fourier.kappa2gamma)(dens_slabs)
+            gamma_k    = get_gamma_from_slabs(nz_src_list, Dz_src, theta_cosmo[0], s_slabs)
+            gamma_ia   = get_gamma_ia_from_slabs(nz_src_list, Dz_src, A_ia, eta_ia, bta, theta_cosmo[0], dens_slabs, s_slabs)
+            gamma      = gamma_k + gamma_ia
 
             # Sample observations
             for i in range(N_SRC_BINS):
@@ -126,6 +127,7 @@ class MCMCSampler:
                 f['Dz_lens'] = samples['Dz_lens'][i]
                 f['A_ia']    = samples['A_ia'][i]
                 f['eta_ia']  = samples['eta_ia'][i]
+                f['bta']     = samples['bta'][i]
                 if(io_config.save_maps):
                     dens_slabs_sample = self.transform.x2delta(samples['x_l'][i], samples['theta_cosmo'][i][np.newaxis])
                     f['slab_dens'] = dens_slabs_sample

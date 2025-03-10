@@ -28,15 +28,14 @@ class SlabConfig:
 class SamplingConfig:
     n_warmup: int
     n_samples: int
-    nuts_tree_depth: int
     burnin_warmup: int
     num_sampling_iterations: int
-
+    nuts_tree_depth: Optional[int] = 11
     
 @dataclass
 class IOConfig:
     output_dir: str
-    save_maps: bool
+    save_maps: Optional[bool] = False
 
 @dataclass
 class DataConfig:
