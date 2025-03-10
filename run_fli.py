@@ -10,9 +10,6 @@ configfile = sys.argv[1]
 
 EnvironmentSetup.setup_jax_env()
 
-theta_fid = np.array([0.27, 0.82])[np.newaxis]
-cosmo     = get_cosmo(theta_fid[0])
-
 config = ConfigLoader(configfile)
 
 slab_params     = config.get_slab_config()
@@ -22,9 +19,10 @@ data_config     = config.get_data_config()
 prior_config    = config.get_prior_config()
 io_config       = config.get_io_config()
 
+cosmo     = get_cosmo(data_config.cosmo_fid)
+
 slab_definition = [slab_params.chi_min, slab_params.chi_max, slab_params.slab_width]
 
-map_tools = MapTools(slab_params.N_grid, slab_params.L)
 F         = FourierTransforms(slab_params.N_grid)
 
 # Initialize catalogs
@@ -44,8 +42,7 @@ obs_calc = ObservableCalculator(z_slabs)
 N_LENS_BINS = len(catalogs.nz_lens_list)
 N_SRC_BINS  = len(catalogs.nz_src_list) 
 
-l           = (slab_params.L / slab_params.N_grid)
-nbar        = data_config.nbar_Mpc3 * l**2 * slab_params.slab_width 
+nbar        = data_config.nbar_Mpc3 * slab_params.pixel_volume
 
 shape_data, counts_data = read_data(data_config.datafile)
 
@@ -56,17 +53,16 @@ from numpyro.infer import MCMC, NUTS, init_to_value
 key = jax.random.PRNGKey(onp.random.randint(1000000))
 rng_key, rng_key_ = jax.random.split(key)
 
-sampler = MCMCSampler(transform, F, obs_calc, N_slabs, slab_params.N_grid, 
-                      data_config.sigma_e, nbar)
+sampler = MCMCSampler(transform, F, obs_calc, 
+                                        catalogs.nz_src_list, catalogs.nz_lens_list, 
+                                        data_config.sigma_e, nbar)
 # run burnin MCMC
 print("Running a burnin chain...")
-model = sampler.setup_model(N_SRC_BINS, N_LENS_BINS, shape_data, counts_data, key)
+model = sampler.setup_model(shape_data, counts_data, key)
 
-burnin_sample = sampler.run_mcmc(model,
-                                    sampling_params,
-                                    catalogs.nz_src_list,
-                                    catalogs.nz_lens_list,
-                                    prior_config.prior,
+burnin_sample = sampler.run_mcmc(model, 
+                                    sampling_params, 
+                                    prior_config.prior, 
                                     rng_key_)
 
 init_values = sampler.get_init_sample(burnin_sample)
@@ -75,10 +71,8 @@ del burnin_sample
 sampler.set_burn_in(False)
 
 samples = sampler.run_mcmc(model, 
-                            sampling_params,
-                            catalogs.nz_src_list, 
-                            catalogs.nz_lens_list,
-                            prior_config.prior,
+                            sampling_params, 
+                            prior_config.prior, 
                             rng_key_,
                             init_values=init_values)
 
@@ -88,14 +82,11 @@ n_start = sampling_params.n_samples
 for n in range(sampling_params.num_sampling_iterations):
     print("Running additional sampling iteration # %d"%(n+1))
     del samples
-    samples = sampler.run_mcmc(model,
-                                sampling_params,
-                                catalogs.nz_src_list,
-                                catalogs.nz_lens_list,
-                                prior_config.prior,
+    samples = sampler.run_mcmc(model, 
+                                sampling_params, 
+                                prior_config.prior, 
                                 rng_key_,
-                                last_state=sampler.last_state
-                                )
+                                last_state=sampler.last_state)
     sampler.save_samples(samples, io_config, sampling_params.n_samples, n_start)
     n_start = n_start + sampling_params.n_samples
 

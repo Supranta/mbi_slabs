@@ -23,6 +23,8 @@ class SlabConfig:
         valid_transforms = ["gaussian", "lognormal"]
         if self.transform not in valid_transforms:
             raise ValueError(f"transform must be one of {valid_transforms}, got {self.transform}")
+        l = (self.L / self.N_grid)
+        self.pixel_volume = l**2 * self.slab_width 
 
 @dataclass
 class SamplingConfig:
@@ -43,6 +45,11 @@ class DataConfig:
     sigma_e: float
     nbar_Mpc3: float
     datafile: str
+    Om_fid: float = 0.27
+    sigma8_fid: float = 0.82
+
+    def __post_init__(self):
+        self.cosmo_fid = np.array([self.Om_fid, self.sigma8_fid])
 
 class EnvironmentSetup:
     @staticmethod
@@ -114,11 +121,8 @@ class ConfigLoader:
                                                                                                                                             
     def get_data_config(self) -> DataConfig:
         data_config = self.config['data']
-        return DataConfig(datafile=data_config['datafile'], 
-                            sigma_e=data_config['sigma_e'],
-                            nbar_Mpc3=data_config['nbar_Mpc3'],
-                            A_ia=data_config['A_ia'])
-
+        return DataConfig(**self.config['data'])
+    
     def get_io_config(self) -> IOConfig:
         io_config = self.config['io']
         return IOConfig(output_dir=io_config['output_dir'],
