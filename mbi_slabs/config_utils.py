@@ -6,7 +6,7 @@ import jax.numpy as np
 import h5py as h5
 import numpyro.distributions as dist
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 @dataclass
 class SlabConfig:
@@ -14,17 +14,17 @@ class SlabConfig:
     chi_max: float
     slab_width: float
     N_grid: int
-    L: float
+    theta_max: float
     transform: str
-    pk_emu_file: str
+    cl_emu_file: str
     polydist_file: Optional[str] = None
 
     def __post_init__(self):
         valid_transforms = ["gaussian", "lognormal"]
         if self.transform not in valid_transforms:
             raise ValueError(f"transform must be one of {valid_transforms}, got {self.transform}")
-        l = (self.L / self.N_grid)
-        self.pixel_volume = l**2 * self.slab_width 
+        theta_pix_arcmin = (self.theta_max * 60.) / self.N_grid
+        self.pixel_area_arcmin2 = theta_pix_arcmin**2 
 
 @dataclass
 class SamplingConfig:
@@ -43,13 +43,17 @@ class IOConfig:
 class DataConfig:
     A_ia: float
     sigma_e: float
-    nbar_Mpc3: float
+    nbar_src: List[float]
+    nbar_lens: List[float]
     datafile: str
     Om_fid: float = 0.27
     sigma8_fid: float = 0.82
 
     def __post_init__(self):
         self.cosmo_fid = np.array([self.Om_fid, self.sigma8_fid])
+        
+        self.nbar_src = np.array(self.nbar_src)
+        self.nbar_lens = np.array(self.nbar_lens)
 
 class EnvironmentSetup:
     @staticmethod
@@ -108,7 +112,7 @@ class ConfigLoader:
         return PriorConfig(self.config['prior'])
 
     def get_slab_config(self) -> SlabConfig:
-        self.pk_emu_file = self.config['slabs']['pk_emu_file']
+        self.cl_emu_file = self.config['slabs']['cl_emu_file']
         return SlabConfig(**self.config['slabs'])
 
     def get_sampling_config(self) -> SamplingConfig:
@@ -124,9 +128,7 @@ class ConfigLoader:
         return DataConfig(**self.config['data'])
     
     def get_io_config(self) -> IOConfig:
-        io_config = self.config['io']
-        return IOConfig(output_dir=io_config['output_dir'],
-                        save_maps=io_config['save_maps'])
+        return IOConfig(**self.config['io'])
                                                                                                                                                             
     def get_observables(self) -> Dict[str, Any]:
         return self.config['observables']

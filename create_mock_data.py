@@ -4,7 +4,6 @@ from mbi_slabs.utils import *
 from mbi_slabs import *
 from mbi_slabs.observables import *
 from mbi_slabs.transforms import GaussianTransform, LogNormalTransform
-from mbi_slabs.transforms import MapTools
 
 EnvironmentSetup.setup_jax_env()
 
@@ -32,9 +31,9 @@ catalogs     = catalog_init.create_catalogs(observables)
 N_slabs = z_slabs.shape[0]
 
 if(slab_params.transform == "gaussian"):
-    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.theta_max, config.cl_emu_file)
 elif(slab_params.transform == "lognormal"):
-    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.theta_max, config.cl_emu_file)
 
 x_l             = np.array(onp.random.normal(size=(N_slabs, 2, slab_params.N_grid, slab_params.N_grid//2 + 1))) 
 dens_slabs_true = transform.x2delta(x_l, data_config.cosmo_fid[np.newaxis])
@@ -48,9 +47,10 @@ kappa_list        = [obs_calc.get_kappa(catalogs.nz_src_list[i], cosmo.Omega_m, 
 kappa_ia_list     = [obs_calc.get_kappa_ia(catalogs.nz_src_list[i], cosmo.Omega_m, 0., data_config.A_ia, 0., dens_slabs_true) for i in range(N_SRC_BINS)]
 proj_density_list = [obs_calc.get_proj_density(catalogs.nz_lens_list[i], 0., dens_slabs_true) for i in range(N_LENS_BINS)]
 
-nbar        = data_config.nbar_Mpc3 * slab_params.pixel_volume 
+nbar_pix        = data_config.nbar_lens * slab_params.pixel_area_arcmin2
+shape_noise_pix = data_config.sigma_e / np.sqrt(data_config.nbar_src * slab_params.pixel_area_arcmin2)
 
-data_gen    = DataGenerator(F, data_config.sigma_e, nbar)
+data_gen    = DataGenerator(F, shape_noise_pix, nbar_pix)
 shape_data  = data_gen.generate_shape_data(kappa_list, kappa_ia_list)
 counts_data = data_gen.generate_galaxy_counts(proj_density_list)
 

@@ -11,9 +11,9 @@ J = 1j
 EPS = 1e-20
 
 class MapTools:
-    def __init__(self, N_grid, L):
-        self.set_map_properties(N_grid, L)
-        self.set_fft_properties(N_grid, self.L)
+    def __init__(self, N_grid, theta_max):
+        self.set_map_properties(N_grid, theta_max)
+        self.set_fft_properties(N_grid, self.theta_max)
         self.imag_indices = self.get_imag_indices()
         self.pixel_window = 1.
 
@@ -67,16 +67,15 @@ class MapTools:
                           (~self.fourier_symm_mask * 
                            jnp.take(Fx[1], self.fourier_symm_flip_ind, axis=0))])
 
-    def set_map_properties(self, N_grid, L):
+    def set_map_properties(self, N_grid, theta_max):
         self.N_grid      = N_grid
-        self.L           = L
-        self.Omega_s     = self.L**2                     # Area of the map  
-        self.PIX_AREA    = self.Omega_s / self.N_grid**2 # Pixel area
-        self.Delta_theta = L / N_grid            
+        self.theta_max   = theta_max * np.pi / 180.          # theta_max in radians
+        self.Omega_s     = self.theta_max**2                 # Area of the map  
+        self.PIX_AREA    = self.Omega_s / self.N_grid**2     # Pixel area            
         
-    def set_fft_properties(self, N_grid, L):
-        lx = 2*np.pi*np.fft.fftfreq(N_grid, d=L / N_grid)
-        ly = 2*np.pi*np.fft.fftfreq(N_grid, d=L / N_grid)
+    def set_fft_properties(self, N_grid, theta_max):
+        lx = 2*np.pi*np.fft.fftfreq(N_grid, d=theta_max / N_grid)
+        ly = 2*np.pi*np.fft.fftfreq(N_grid, d=theta_max / N_grid)
 
         N_Y = (N_grid//2 +1)
         self.N_Y = N_Y

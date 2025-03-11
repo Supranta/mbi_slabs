@@ -4,7 +4,6 @@ from mbi_slabs.utils import *
 from mbi_slabs import *
 from mbi_slabs.observables import *
 from mbi_slabs.transforms import GaussianTransform, LogNormalTransform
-from mbi_slabs.transforms import MapTools
 
 configfile = sys.argv[1]
 
@@ -33,18 +32,23 @@ catalogs = catalog_init.create_catalogs(observables)
 N_slabs = z_slabs.shape[0]
 
 if(slab_params.transform=='gaussian'):
-    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
+    transform = GaussianTransform(N_slabs, slab_params.N_grid, slab_params.theta_max, config.cl_emu_file)
 elif(slab_params.transform=='lognormal'):
-    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.L, config.pk_emu_file)
+    transform = LogNormalTransform(N_slabs, slab_params.N_grid, slab_params.theta_max, config.cl_emu_file)
 
 obs_calc = ObservableCalculator(z_slabs)
 
 N_LENS_BINS = len(catalogs.nz_lens_list)
 N_SRC_BINS  = len(catalogs.nz_src_list) 
 
-nbar        = data_config.nbar_Mpc3 * slab_params.pixel_volume
+nbar_pix        = data_config.nbar_lens * slab_params.pixel_area_arcmin2
+shape_noise_pix = data_config.sigma_e / np.sqrt(data_config.nbar_src * slab_params.pixel_area_arcmin2)
 
 shape_data, counts_data = read_data(data_config.datafile)
+
+##========================================================
+##================= Run numpyro sampler ==================
+##========================================================
 
 import numpyro
 import numpyro.distributions as dist
@@ -55,7 +59,7 @@ rng_key, rng_key_ = jax.random.split(key)
 
 sampler = MCMCSampler(transform, F, obs_calc, 
                                         catalogs.nz_src_list, catalogs.nz_lens_list, 
-                                        data_config.sigma_e, nbar)
+                                        shape_noise_pix, nbar_pix)
 # run burnin MCMC
 print("Running a burnin chain...")
 model = sampler.setup_model(shape_data, counts_data, key)

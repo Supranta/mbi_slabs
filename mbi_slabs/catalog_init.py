@@ -111,7 +111,7 @@ class CatalogInitializer:
         nz_lens_list = []
 
         if self.polydist_file is not None and os.path.exists(self.polydist_file):
-            print("Loading polyfit file...")
+            print("Loading polydist file...")
             deg, Om_fid, polyfit_grid, polyfit_slab = self.load_polydist_file()
         else:
             deg = 4

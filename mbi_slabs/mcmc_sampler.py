@@ -76,12 +76,12 @@ class MCMCSampler:
             # Sample observations
             for i in range(self.N_SRC_BINS):
                 numpyro.sample(f'e_obs_{i+1}', 
-                             dist.Normal((1. + m[i]) * gamma[i], self.sigma_noise), 
+                             dist.Normal((1. + m[i]) * gamma[i], self.sigma_noise[i]), 
                              obs=shape_data[i])
 
             for i in range(self.N_LENS_BINS):
                 proj_density = self.obs_calc.get_proj_density(self.nz_lens_list[i], Dz_lens[i], dens_slabs)
-                mu = np.clip(self.nbar * (1. + bg[i] * proj_density), 1e-3)
+                mu = np.clip(self.nbar[i] * (1. + bg[i] * proj_density), 1e-3)
                 numpyro.sample(f'Ng_{i+1}', dist.Poisson(mu), obs=counts_data[i])
 
         return density_slab_model

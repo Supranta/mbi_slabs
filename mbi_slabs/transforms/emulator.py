@@ -69,31 +69,31 @@ class JAXGP:
         print(f"Optimized hyperparameters: length_scale={opt_params[:-1]}, "
               f"signal_var={opt_params[-1]:.4f}") 
 
-def normalize_pk(pk_scale):
-    k0_scaling = pk_scale[:,0]
-    pk_fit = pk_scale / k0_scaling[:,np.newaxis]
-    return pk_fit, np.log(k0_scaling)
+def normalize_cl(cl_scale):
+    l0_scaling = cl_scale[:,0]
+    cl_fit = cl_scale / l0_scaling[:,np.newaxis]
+    return cl_fit, np.log(l0_scaling)
 
-def fit_pca(pk_scale, N_PCA=6):
-    pk_fit, k0_scaling = normalize_pk(pk_scale)
+def fit_pca(cl_scale, N_PCA=6):
+    cl_fit, l0_scaling = normalize_cl(cl_scale)
     pca = PCA(N_PCA)
-    pca.fit(pk_fit)
-    pca_coeff = pca.transform(pk_fit)
+    pca.fit(cl_fit)
+    pca_coeff      = pca.transform(cl_fit)
     pca_mean       = pca.mean_
     pca_components = pca.components_
-    return np.array(pca_coeff), k0_scaling, np.array(pca_mean), np.array(pca_components)
+    return np.array(pca_coeff), l0_scaling, np.array(pca_mean), np.array(pca_components)
 
-class PkEmulator:
+class ClEmulator:
     def __init__(self, emu_file, lognormal=False):
         self.emu_file = emu_file
         self.emu_trained = False
         with h5.File(self.emu_file, 'r') as f:
-            self.k   = f['k'][:]
-            fid = f['fiducial']
-            self.pk_fid = fid['Pk'][:][0]
+            self.ell       = f['ell'][:]
+            fid            = f['fiducial']
+            self.cl_fid    = fid['cl'][:][0]
             self.theta_fid = fid['theta'][:]
-            theta    = f['emulator']['theta'][:]
-            pk_scale = f['emulator']['Pk_scale'][:]
+            theta          = f['emulator']['theta'][:]
+            cl_scale       = f['emulator']['cl_scale'][:]
             if(lognormal):
                 self.y_mean_fid = fid['mu_y'][:]
                 y_scale = f['emulator']['y_scale'][:]
@@ -101,26 +101,26 @@ class PkEmulator:
                 y_scale = None
             self.emu_trained = 'trained_emu' in f
         self.theta = np.array(theta)
-        self.N_slabs = pk_scale.shape[1]
+        self.N_slabs = cl_scale.shape[1]
         self.ndim = 2
         self.N_PCA = 6
-        self.N_k   = pk_scale.shape[-1]
+        self.N_ell = cl_scale.shape[-1]
         self.lognormal = lognormal
         if self.emu_trained:
             self.load_emu()
         else:
-            self.train_emu(pk_scale, y_scale)
+            self.train_emu(cl_scale, y_scale)
             self.save_emu()
 
-    def train_emu(self, pk_scale, y_scale=None):
+    def train_emu(self, cl_scale, y_scale=None):
         self.gp_list = []
         pca_means       = []
         pca_components = []
         for i in trange(self.N_slabs):
-            pca_coeff, k0_scaling, pca_mean, pca_component = fit_pca(pk_scale[:,i], self.N_PCA)
+            pca_coeff, l0_scaling, pca_mean, pca_component = fit_pca(cl_scale[:,i], self.N_PCA)
             pca_means.append(pca_mean)              
             pca_components.append(pca_component)
-            k0_scaling_gp = self.train_gp(k0_scaling)
+            l0_scaling_gp = self.train_gp(l0_scaling)
             pca_coeff_gps = []
             pca_coeffs    = [] 
             for j in range(self.N_PCA):
@@ -128,14 +128,14 @@ class PkEmulator:
                 pca_coeffs.append(np.array(pca_coeff[:,j]))
                 pca_coeff_gp = self.train_gp(np.array(pca_coeff[:,j]))
                 pca_coeff_gps.append(pca_coeff_gp)
-            gp_i = [k0_scaling_gp, pca_coeff_gps]
+            gp_i = [l0_scaling_gp, pca_coeff_gps]
             if(self.lognormal):
                 y_gp = self.train_gp(y_scale[:,i])
                 gp_i.append(y_gp)
             self.gp_list.append(gp_i)
         self.pca_mean       = np.array(pca_means)
         self.pca_components = np.array(pca_components)
-        self.extract_k0_gp_params()
+        self.extract_l0_gp_params()
         self.extract_pca_gp_params()
         if(self.lognormal):
             self.extract_y_gp_params()
@@ -149,16 +149,16 @@ class PkEmulator:
     def _extract_gp_params(self, gp):
         return gp.params, gp.alpha 
 
-    def extract_k0_gp_params(self):
+    def extract_l0_gp_params(self):
         params_list  = []
         alpha_list   = []
         for i in range(self.N_slabs):
-            k0_scaling_gp = self.gp_list[i][0]
-            params, alpha = self._extract_gp_params(k0_scaling_gp)
+            l0_scaling_gp = self.gp_list[i][0]
+            params, alpha = self._extract_gp_params(l0_scaling_gp)
             params_list.append(params)
             alpha_list.append(alpha)
-        self.k0_params = np.array(params_list)
-        self.k0_alpha  = np.array(alpha_list)
+        self.l0_params = np.array(params_list)
+        self.l0_alpha  = np.array(alpha_list)
 
     def extract_y_gp_params(self):
         params_list  = []
@@ -188,9 +188,9 @@ class PkEmulator:
                                 in_axes=(0, None, None))
         return batch_kernel_fn(params_batch, theta_pred, self.theta)
 
-    def get_k0(self, theta_pred):
-        Ks = self.get_gp_kernel(self.k0_params, theta_pred)[:,0]
-        return np.sum(Ks * self.k0_alpha, axis=1) 
+    def get_l0(self, theta_pred):
+        Ks = self.get_gp_kernel(self.l0_params, theta_pred)[:,0]
+        return np.sum(Ks * self.l0_alpha, axis=1) 
 
     def get_y_mean(self, theta_pred):
         Ks = self.get_gp_kernel(self.y_params, theta_pred)[:,0]
@@ -202,18 +202,18 @@ class PkEmulator:
         pca_coeff = np.sum(Ks * self.pca_alpha, axis=1)
         return pca_coeff.reshape((self.N_slabs, self.N_PCA))
 
-    def predict_pk(self, theta_pred):
-        k0 = self.get_k0(theta_pred)[np.newaxis,:,np.newaxis]
+    def predict_cl(self, theta_pred):
+        l0 = self.get_l0(theta_pred)[np.newaxis,:,np.newaxis]
         pca_coeffs = self.get_pca_coeff(theta_pred)[:,:,np.newaxis]
-        pk_pred = self.pca_mean + np.sum(pca_coeffs * self.pca_components, axis=1)
-        return np.exp(k0) * pk_pred * self.pk_fid
+        cl_pred = self.pca_mean + np.sum(pca_coeffs * self.pca_components, axis=1)
+        return np.exp(l0) * cl_pred * self.cl_fid
  
     def load_emu(self):
         print("Loading emulator...")
         with h5.File(self.emu_file, 'r') as f:
             trained_emu = f['trained_emu']
-            self.k0_params = trained_emu['k0_params'][:]
-            self.k0_alpha  = trained_emu['k0_alpha'][:]
+            self.l0_params = trained_emu['l0_params'][:]
+            self.l0_alpha  = trained_emu['l0_alpha'][:]
             self.pca_params = trained_emu['pca_params'][:] 
             self.pca_alpha = trained_emu['pca_alpha'][:]  
             self.pca_mean = trained_emu['pca_mean'][:]
@@ -226,8 +226,8 @@ class PkEmulator:
         print("Saving emulator...")
         with h5.File(self.emu_file, 'r+') as f:
             trained_emu = f.create_group('trained_emu')
-            trained_emu['k0_params'] = self.k0_params
-            trained_emu['k0_alpha']  = self.k0_alpha
+            trained_emu['l0_params'] = self.l0_params
+            trained_emu['l0_alpha']  = self.l0_alpha
             trained_emu['pca_params'] = self.pca_params
             trained_emu['pca_alpha']  = self.pca_alpha
             trained_emu['pca_mean']   = self.pca_mean

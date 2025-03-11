@@ -12,12 +12,12 @@ class DataGenerator:
         """Generate shape data from kappa maps"""
         shape_data = []
         
-        for kappa, kappa_ia in zip(kappa_list, kappa_ia_list):
+        for i, (kappa, kappa_ia) in enumerate(zip(kappa_list, kappa_ia_list)):
             gamma_1, gamma_2 = self.F.kappa2gamma(kappa)
             gamma_ia_1, gamma_ia_2 = self.F.kappa2gamma(kappa_ia)
             
-            e1_obs = gamma_1 + gamma_ia_1 + np.array(self.sigma_noise * onp.random.normal(size=kappa.shape))
-            e2_obs = gamma_2 + gamma_ia_2 + np.array(self.sigma_noise * onp.random.normal(size=kappa.shape))
+            e1_obs = gamma_1 + gamma_ia_1 + np.array(self.sigma_noise[i] * onp.random.normal(size=kappa.shape))
+            e2_obs = gamma_2 + gamma_ia_2 + np.array(self.sigma_noise[i] * onp.random.normal(size=kappa.shape))
             
             shape_data.append(np.array([e1_obs, e2_obs]))
             
@@ -27,8 +27,8 @@ class DataGenerator:
         """Generate galaxy counts from projected density"""
         N_gals_data = []
         
-        for proj_density in proj_density_list:
-            mu = self.nbar * (1. + proj_density)
+        for i, proj_density in enumerate(proj_density_list):
+            mu = self.nbar[i] * (1. + proj_density)
             N_gals = onp.random.poisson(np.clip(mu, 1e-3))
             N_gals_data.append(np.array(N_gals))
             
