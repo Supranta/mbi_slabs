@@ -1,0 +1,86 @@
+io:
+    output_dir: output/Alex
+
+slabs:
+    chi_min: 0.
+    chi_max: 4000.
+    slab_width: 150.
+    N_grid: 256
+    theta_max: 21.33333333
+    transform: lognormal
+    cl_emu_file: data/emulator/emulator_data_LN_angular.h5
+    polydist_file: data/emulator/polydist_angular.h5
+
+observables:
+    bin0:
+        type: dens 
+        nz_file: data/des_y3/nz/redmagic_bin1.npy
+        
+    bin1:
+        type: dens
+        nz_file: data/des_y3/nz/redmagic_bin2.npy
+     
+    bin2:
+        type: dens
+        nz_file: data/des_y3/nz/redmagic_bin3.npy
+        
+    bin3:
+        type: dens
+        nz_file: data/des_y3/nz/redmagic_bin4.npy
+    
+    bin4:
+        type: dens
+        nz_file: data/des_y3/nz/redmagic_bin5.npy
+        
+    bin5:
+        type: kappa
+        nz_file: data/des_y3/nz/source_bin1.npy
+        
+    bin6:
+        type: kappa
+        nz_file: data/des_y3/nz/source_bin2.npy
+        
+    bin7:
+        type: kappa
+        nz_file: data/des_y3/nz/source_bin3.npy
+        
+    bin8:
+        type: kappa
+        nz_file: data/des_y3/nz/source_bin4.npy
+        
+prior:
+    theta_cosmo:
+        dist: deterministic
+        value: 0.3,0.8 # Values of Omega_m, sigma_8
+    Dz_src: 
+        dist: deterministic
+        value: 0.0,0.0,0.0,0.0 # Value of the Delta_z shift
+    m:
+        dist: deterministic
+        value: 0.0,0.0,0.0,0.0 # Value of the shear multiplicative bias
+    A_ia:
+        dist: deterministic  # Value fo IA amplitude
+        value: 0.0
+    eta_ia:
+        dist: deterministic # Value of IA redshift evolution
+        value: 0.0
+    Dz_lens: 
+        dist: deterministic
+        value: 0.0,0.0,0.0,0.0,0.0 # Value of lens Delta_z shift
+    bg: 
+        dist: deterministic
+        value: 1.0,1.0,1.0,1.0,1.0 # Value fo galaxy bias
+
+data:
+    datafile: data/Alex/test_catalog.h5
+    sigma_e: 0.26
+    nbar_src: [1.5,1.5,1.5,1.5]
+    nbar_lens: [0.03,0.03,0.03,0.03,0.03]
+    A_ia: 0.5
+
+sampling:  
+    mcmc:
+        n_warmup: 500
+        n_samples: 200
+        nuts_tree_depth: 11
+        num_sampling_iterations: 19
